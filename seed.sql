@@ -102,12 +102,48 @@ SET category_id = EXCLUDED.category_id,
     original_price = EXCLUDED.original_price,
     is_active = EXCLUDED.is_active,
     is_featured = EXCLUDED.is_featured;
+
+-- 상품 5: 미니멀 레더 크로스 바디백 (액세서리, 89,000원)
+INSERT INTO public.products (id, category_id, name, description, price, original_price, is_active, is_featured)
+VALUES (
+    '55555555-5555-5555-8555-555555555555',
+    (SELECT id FROM public.categories WHERE slug = 'acc'),
+    '미니멀 레더 크로스 바디백',
+    '모던한 스퀘어 쉐입과 부드러운 천연 소가죽 질감을 살린 데일리 에센셜 백입니다.',
+    89000,
+    119000,
+    true,
+    true
+)
+ON CONFLICT (id) DO UPDATE
 SET category_id = EXCLUDED.category_id,
     name = EXCLUDED.name,
     description = EXCLUDED.description,
     price = EXCLUDED.price,
     original_price = EXCLUDED.original_price,
-    is_active = EXCLUDED.is_active;
+    is_active = EXCLUDED.is_active,
+    is_featured = EXCLUDED.is_featured;
+
+-- 상품 6: 실버 레이어드 체인 네크리스 (액세서리, 25,000원)
+INSERT INTO public.products (id, category_id, name, description, price, original_price, is_active, is_featured)
+VALUES (
+    '66666666-6666-6666-8666-666666666666',
+    (SELECT id FROM public.categories WHERE slug = 'acc'),
+    '실버 레이어드 체인 네크리스',
+    '써지컬 스틸 소재로 변색 없이 은은한 포인트를 주는 투웨이 레이어드 목걸이입니다.',
+    25000,
+    25000,
+    true,
+    true
+)
+ON CONFLICT (id) DO UPDATE
+SET category_id = EXCLUDED.category_id,
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    price = EXCLUDED.price,
+    original_price = EXCLUDED.original_price,
+    is_active = EXCLUDED.is_active,
+    is_featured = EXCLUDED.is_featured;
 
 
 -- 3. 첫 번째 상품(베이직 크롭 티셔츠) 옵션 9개 등록 (블랙/화이트/베이지 × S/M/L)
@@ -131,7 +167,9 @@ DELETE FROM public.product_images WHERE product_id IN (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     '33333333-3333-4333-8333-333333333333',
-    '44444444-4444-4444-8444-444444444444'
+    '44444444-4444-4444-8444-444444444444',
+    '55555555-5555-5555-8555-555555555555',
+    '66666666-6666-6666-8666-666666666666'
 );
 
 INSERT INTO public.product_images (product_id, image_url, is_thumbnail, display_order)
@@ -143,4 +181,8 @@ VALUES
     -- 오버핏 코튼 자켓 (아우터)
     ('33333333-3333-4333-8333-333333333333', 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&auto=format&fit=crop&q=80', true, 1),
     -- 플로럴 미디 원피스 (원피스)
-    ('44444444-4444-4444-8444-444444444444', 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&auto=format&fit=crop&q=80', true, 1);
+    ('44444444-4444-4444-8444-444444444444', 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&auto=format&fit=crop&q=80', true, 1),
+    -- 미니멀 레더 크로스 바디백 (액세서리)
+    ('55555555-5555-5555-8555-555555555555', 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&auto=format&fit=crop&q=80', true, 1),
+    -- 실버 레이어드 체인 네크리스 (액세서리)
+    ('66666666-6666-6666-8666-666666666666', 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&auto=format&fit=crop&q=80', true, 1);

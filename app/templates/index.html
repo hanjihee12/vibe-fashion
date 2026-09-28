@@ -81,55 +81,101 @@
 
 <!--
     ================================================================
-    [3. 트렌딩 상품 섹션 (Trending Products Section)]
-    요구사항: picsum.photos 더미 상품 카드 4개 구성
-    Flask 뷰 함수에서 전달받은 products 리스트를 Jinja2 템플릿 문법으로 반복 출력합니다.
+    [3. 카테고리별 컬렉션 섹션 (상의 / 하의 / 악세사리 칸 분리)]
+    상의(TOP), 하의(BOTTOM), 악세사리(ACC)를 명확한 칸(Section)으로 나누어 전시합니다.
     ================================================================
 -->
 <section class="container py-4 mb-5" id="products-section">
-    <!-- 섹션 헤더 -->
-    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 border-bottom pb-3">
-        <div>
-            <span class="text-danger fw-bold small text-uppercase tracking-wider">
-                <i class="bi bi-fire me-1"></i>WEEKLY BESTSELLERS
-            </span>
-            <h2 class="fw-bolder fs-2 mt-1 mb-0 text-dark">
-                지금 주목받는 패션 아이템
-            </h2>
+
+    <!-- [카테고리 퀵 내비게이션 바로가기 카드] -->
+    <div class="row g-3 mb-5">
+        <div class="col-md-4">
+            <a href="#top-section" class="text-decoration-none">
+                <div class="p-4 rounded-4 bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex align-items-center justify-content-between text-dark shadow-sm h-100 hover-lift">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                            <i class="bi bi-tag-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <span class="badge bg-primary text-white mb-1">TOP</span>
+                            <h5 class="fw-bold mb-0">상의 컬렉션</h5>
+                            <small class="text-secondary">티셔츠, 셔츠, 니트, 후디</small>
+                        </div>
+                    </div>
+                    <i class="bi bi-arrow-right-circle fs-3 text-primary"></i>
+                </div>
+            </a>
         </div>
-        <p class="text-secondary small mb-0 mt-2 mt-md-0">
-            실시간 판매량 1위부터 4위까지의 베스트 아이템을 소개합니다.
-        </p>
+        <div class="col-md-4">
+            <a href="#bottom-section" class="text-decoration-none">
+                <div class="p-4 rounded-4 bg-success bg-opacity-10 border border-success border-opacity-25 d-flex align-items-center justify-content-between text-dark shadow-sm h-100 hover-lift">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-success text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                            <i class="bi bi-columns-gap fs-4"></i>
+                        </div>
+                        <div>
+                            <span class="badge bg-success text-white mb-1">BOTTOM</span>
+                            <h5 class="fw-bold mb-0">하의 컬렉션</h5>
+                            <small class="text-secondary">와이드 데님, 슬랙스, 조거</small>
+                        </div>
+                    </div>
+                    <i class="bi bi-arrow-right-circle fs-3 text-success"></i>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="#acc-section" class="text-decoration-none">
+                <div class="p-4 rounded-4 bg-info bg-opacity-10 border border-info border-opacity-25 d-flex align-items-center justify-content-between text-dark shadow-sm h-100 hover-lift">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-info text-white rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+                            <i class="bi bi-gem fs-4"></i>
+                        </div>
+                        <div>
+                            <span class="badge bg-info text-white mb-1">ACC & BAG</span>
+                            <h5 class="fw-bold mb-0">악세사리 컬렉션</h5>
+                            <small class="text-secondary">백, 목걸이, 볼캡, 벨트</small>
+                        </div>
+                    </div>
+                    <i class="bi bi-arrow-right-circle fs-3 text-info"></i>
+                </div>
+            </a>
+        </div>
     </div>
 
-    <!-- 상품 카드 그리드 (Supabase products 동적 출력) -->
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-4">
-        {% if products %}
-            {% for product in products %}
-            <!-- 단일 상품 카드 컴포넌트 시작 -->
+    <!-- ================= 1. 상의 (TOP) 전용 칸 ================= -->
+    <div class="mb-5 pt-2" id="top-section">
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 border-bottom pb-3">
+            <div>
+                <span class="text-primary fw-bold small text-uppercase tracking-wider">
+                    <i class="bi bi-tag-fill me-1"></i>TOP COLLECTION
+                </span>
+                <h3 class="fw-bolder fs-2 mt-1 mb-0 text-dark">
+                    상의 (TOP)
+                </h3>
+            </div>
+            <p class="text-secondary small mb-0 mt-2 mt-md-0">
+                트렌디한 실루엣과 감각적인 핏의 데일리 상의 라인업
+            </p>
+        </div>
+
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-4">
+            {% for product in top_products %}
             <div class="col">
                 <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
-                    <!-- 상품 이미지 영역 (thumbnail_url 표시) -->
                     <div class="position-relative product-img-wrapper">
                         <img src="{{ product.thumbnail_url }}" 
                              class="card-img-top product-img" 
                              alt="{{ product.name }}"
                              loading="lazy">
-                        
-                        <!-- 뱃지 표시 -->
-                        <span class="badge bg-{{ product.badge_color|default('coral') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
-                            {{ product.badge|default('NEW') }}
+                        <span class="badge bg-{{ product.badge_color|default('primary') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
+                            {{ product.badge|default('TOP') }}
                         </span>
-
-                        <!-- 찜하기(위시리스트) 버튼 -->
                         <button type="button" 
                                 class="btn btn-light btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow-sm wishlist-btn"
                                 title="위시리스트에 담기"
                                 onclick="toggleWishlist(this)">
                             <i class="bi bi-heart text-danger"></i>
                         </button>
-
-                        <!-- 빠른 장바구니 담기 오버레이 버튼 -->
                         <div class="product-overlay-action">
                             <button type="button" 
                                     class="btn btn-dark w-100 py-2 fw-semibold shadow"
@@ -138,27 +184,18 @@
                             </button>
                         </div>
                     </div>
-
-                    <!-- 상품 설명 본문 -->
                     <div class="card-body d-flex flex-column p-3">
-                        <!-- 카테고리 -->
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="badge bg-light text-secondary border small">{{ product.category|default('ITEM') }}</span>
+                            <span class="badge bg-light text-primary border small">{{ product.category|default('상의') }}</span>
                         </div>
-
-                        <!-- 상품명 -->
                         <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
                             {{ product.name }}
                         </h5>
-
-                        <!-- 간략 설명 -->
                         {% if product.description %}
                         <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
                             {{ product.description }}
                         </p>
                         {% endif %}
-
-                        <!-- 가격 및 구매 버튼 -->
                         <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-auto">
                             <div>
                                 <span class="fw-bold fs-5 text-dark">{{ product.price }}</span>
@@ -172,19 +209,152 @@
                     </div>
                 </div>
             </div>
-            <!-- 단일 상품 카드 컴포넌트 끝 -->
             {% endfor %}
-        {% else %}
-            <!-- 상품 목록이 비어있거나 불러오지 못했을 때 안내 -->
-            <div class="col-12 text-center py-5">
-                <div class="p-5 bg-white rounded-3 shadow-sm border">
-                    <i class="bi bi-exclamation-circle text-muted fs-1 mb-3 d-block"></i>
-                    <h5 class="fw-bold text-dark mb-2">등록된 추천 상품이 없습니다</h5>
-                    <p class="text-secondary small mb-0">일시적으로 상품 정보를 불러올 수 없거나 추천 상품이 준비 중입니다.</p>
+        </div>
+    </div>
+
+    <!-- ================= 2. 하의 (BOTTOM) 전용 칸 ================= -->
+    <div class="mb-5 pt-4" id="bottom-section">
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 border-bottom pb-3">
+            <div>
+                <span class="text-success fw-bold small text-uppercase tracking-wider">
+                    <i class="bi bi-columns-gap me-1"></i>BOTTOM COLLECTION
+                </span>
+                <h3 class="fw-bolder fs-2 mt-1 mb-0 text-dark">
+                    하의 (BOTTOM)
+                </h3>
+            </div>
+            <p class="text-secondary small mb-0 mt-2 mt-md-0">
+                편안한 착용감과 내추럴한 실루엣의 데님 & 슬랙스 라인업
+            </p>
+        </div>
+
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-4">
+            {% for product in bottom_products %}
+            <div class="col">
+                <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
+                    <div class="position-relative product-img-wrapper">
+                        <img src="{{ product.thumbnail_url }}" 
+                             class="card-img-top product-img" 
+                             alt="{{ product.name }}"
+                             loading="lazy">
+                        <span class="badge bg-{{ product.badge_color|default('success') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
+                            {{ product.badge|default('BOTTOM') }}
+                        </span>
+                        <button type="button" 
+                                class="btn btn-light btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow-sm wishlist-btn"
+                                title="위시리스트에 담기"
+                                onclick="toggleWishlist(this)">
+                            <i class="bi bi-heart text-danger"></i>
+                        </button>
+                        <div class="product-overlay-action">
+                            <button type="button" 
+                                    class="btn btn-dark w-100 py-2 fw-semibold shadow"
+                                    onclick="addToCart('{{ product.name }}', '{{ product.price }}')">
+                                <i class="bi bi-bag-plus me-1"></i>장바구니 담기
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body d-flex flex-column p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-light text-success border small">{{ product.category|default('하의') }}</span>
+                        </div>
+                        <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
+                            {{ product.name }}
+                        </h5>
+                        {% if product.description %}
+                        <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
+                            {{ product.description }}
+                        </p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-auto">
+                            <div>
+                                <span class="fw-bold fs-5 text-dark">{{ product.price }}</span>
+                            </div>
+                            <button type="button" 
+                                    class="btn btn-outline-dark btn-sm px-3 fw-semibold"
+                                    onclick="addToCart('{{ product.name }}', '{{ product.price }}')">
+                                담기
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        {% endif %}
+            {% endfor %}
+        </div>
     </div>
+
+    <!-- ================= 3. 악세사리 (ACC) 전용 칸 ================= -->
+    <div class="mb-5 pt-4" id="acc-section">
+        <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 border-bottom pb-3">
+            <div>
+                <span class="text-info fw-bold small text-uppercase tracking-wider">
+                    <i class="bi bi-gem me-1"></i>ACCESSORY COLLECTION
+                </span>
+                <h3 class="fw-bolder fs-2 mt-1 mb-0 text-dark">
+                    악세사리 (ACC & BAG)
+                </h3>
+            </div>
+            <p class="text-secondary small mb-0 mt-2 mt-md-0">
+                스타일의 완성도를 더해주는 감각적인 백 & 주얼리 라인업
+            </p>
+        </div>
+
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-4">
+            {% for product in acc_products %}
+            <div class="col">
+                <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
+                    <div class="position-relative product-img-wrapper">
+                        <img src="{{ product.thumbnail_url }}" 
+                             class="card-img-top product-img" 
+                             alt="{{ product.name }}"
+                             loading="lazy">
+                        <span class="badge bg-{{ product.badge_color|default('info') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
+                            {{ product.badge|default('ACC') }}
+                        </span>
+                        <button type="button" 
+                                class="btn btn-light btn-sm rounded-circle position-absolute top-0 end-0 m-3 shadow-sm wishlist-btn"
+                                title="위시리스트에 담기"
+                                onclick="toggleWishlist(this)">
+                            <i class="bi bi-heart text-danger"></i>
+                        </button>
+                        <div class="product-overlay-action">
+                            <button type="button" 
+                                    class="btn btn-dark w-100 py-2 fw-semibold shadow"
+                                    onclick="addToCart('{{ product.name }}', '{{ product.price }}')">
+                                <i class="bi bi-bag-plus me-1"></i>장바구니 담기
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body d-flex flex-column p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-light text-info border small">{{ product.category|default('악세사리') }}</span>
+                        </div>
+                        <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
+                            {{ product.name }}
+                        </h5>
+                        {% if product.description %}
+                        <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
+                            {{ product.description }}
+                        </p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-auto">
+                            <div>
+                                <span class="fw-bold fs-5 text-dark">{{ product.price }}</span>
+                            </div>
+                            <button type="button" 
+                                    class="btn btn-outline-dark btn-sm px-3 fw-semibold"
+                                    onclick="addToCart('{{ product.name }}', '{{ product.price }}')">
+                                담기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
 </section>
 
 <!--
