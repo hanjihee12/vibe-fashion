@@ -214,4 +214,158 @@
         </div>
     </div>
 </section>
+
+<!--
+    ================================================================
+    [5. 고객 문의게시판 (Q&A Section)]
+    상품, 배송, 교환/반품 등 고객 문의 사항을 확인하고 직접 등록할 수 있는 공간
+    ================================================================
+-->
+<section class="container my-5 py-4" id="inquiry-section">
+    <!-- 섹션 헤더 -->
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4 border-bottom pb-3">
+        <div>
+            <span class="text-primary fw-bold small text-uppercase tracking-wider">
+                <i class="bi bi-headset me-1"></i>CUSTOMER SERVICE
+            </span>
+            <h2 class="fw-bolder fs-2 mt-1 mb-0 text-dark">
+                <i class="bi bi-chat-square-text-fill text-dark me-2"></i>문의게시판
+            </h2>
+        </div>
+        <div class="d-flex gap-2 mt-3 mt-md-0">
+            <button type="button" class="btn btn-dark fw-semibold px-4 py-2 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#inquiryModal">
+                <i class="bi bi-pencil-square me-1"></i>문의글 작성하기
+            </button>
+        </div>
+    </div>
+
+    <!-- 문의게시판 테이블 카드 -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+                <thead class="table-light border-bottom">
+                    <tr>
+                        <th style="width: 8%;">번호</th>
+                        <th style="width: 14%;">분류</th>
+                        <th class="text-start" style="width: 48%;">제목</th>
+                        <th style="width: 12%;">작성자</th>
+                        <th style="width: 12%;">작성일</th>
+                        <th style="width: 10%;">상태</th>
+                    </tr>
+                </thead>
+                <tbody id="inquiryTableBody">
+                    <tr>
+                        <td class="text-secondary fw-semibold">4</td>
+                        <td><span class="badge bg-light text-dark border">배송문의</span></td>
+                        <td class="text-start">
+                            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="toggleInquiryDetail(this)">
+                                <i class="bi bi-lock-fill text-muted me-1"></i> 설 연휴 배송 마감 일정이 어떻게 되나요?
+                            </a>
+                            <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none">
+                                <i class="bi bi-arrow-return-right me-1 text-primary"></i><strong>[관리자 답변]</strong> 설 연휴 이전 발송은 2월 5일 오후 2시 주문 건까지 마감됩니다. 이후 주문은 연휴 직후 순차 발송됩니다.
+                            </div>
+                        </td>
+                        <td class="text-secondary">김*민</td>
+                        <td class="text-secondary small">2026-09-27</td>
+                        <td><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">답변완료</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-secondary fw-semibold">3</td>
+                        <td><span class="badge bg-light text-dark border">상품문의</span></td>
+                        <td class="text-start">
+                            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="toggleInquiryDetail(this)">
+                                <i class="bi bi-lock-fill text-muted me-1"></i> 오버핏 울 블레이저 재입고 예정이 있나요?
+                            </a>
+                            <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none">
+                                <i class="bi bi-arrow-return-right me-1 text-primary"></i><strong>[관리자 답변]</strong> 문의하신 상품은 현재 추가 제작 중이며, 다음 주 중 재입고 알림이 발송될 예정입니다.
+                            </div>
+                        </td>
+                        <td class="text-secondary">이*수</td>
+                        <td class="text-secondary small">2026-09-26</td>
+                        <td><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">답변완료</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-secondary fw-semibold">2</td>
+                        <td><span class="badge bg-light text-dark border">교환/반품</span></td>
+                        <td class="text-start">
+                            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="toggleInquiryDetail(this)">
+                                <i class="bi bi-lock-fill text-muted me-1"></i> 사이즈 교환 신청 방법 알려주세요.
+                            </a>
+                            <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none">
+                                <i class="bi bi-arrow-return-right me-1 text-primary"></i><strong>[관리자 답변]</strong> 마이페이지 또는 고객센터(1588-0000)를 통해 접수해 주시면 기사님 방문 수거를 도와드립니다.
+                            </div>
+                        </td>
+                        <td class="text-secondary">박*서</td>
+                        <td class="text-secondary small">2026-09-25</td>
+                        <td><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">답변완료</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-secondary fw-semibold">1</td>
+                        <td><span class="badge bg-light text-dark border">기타</span></td>
+                        <td class="text-start">
+                            <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="toggleInquiryDetail(this)">
+                                <i class="bi bi-lock-fill text-muted me-1"></i> 신규 가입 10% 웰컴 쿠폰 사용 방법
+                            </a>
+                            <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none">
+                                <i class="bi bi-arrow-return-right me-1 text-primary"></i><strong>[관리자 답변]</strong> 주문 결제 페이지의 '쿠폰 적용' 란에서 즉시 선택하여 할인받으실 수 있습니다.
+                            </div>
+                        </td>
+                        <td class="text-secondary">최*호</td>
+                        <td class="text-secondary small">2026-09-24</td>
+                        <td><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">답변완료</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- [문의 작성 모달] -->
+<div class="modal fade" id="inquiryModal" tabindex="-1" aria-labelledby="inquiryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="inquiryModalLabel">
+                    <i class="bi bi-pencil-square text-dark me-2"></i>1:1 문의글 작성
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="inquiryForm" onsubmit="submitInquiry(event)">
+                <div class="modal-body pt-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">문의 분류</label>
+                        <select class="form-select" id="inquiryCategory" required>
+                            <option value="상품문의">상품문의</option>
+                            <option value="배송문의">배송문의</option>
+                            <option value="교환/반품">교환/반품</option>
+                            <option value="기타">기타문의</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">작성자 이름</label>
+                        <input type="text" class="form-control" id="inquiryAuthor" placeholder="성함을 입력해주세요" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">문의 제목</label>
+                        <input type="text" class="form-control" id="inquiryTitle" placeholder="문의 제목을 입력해주세요" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">문의 내용</label>
+                        <textarea class="form-control" id="inquiryContent" rows="4" placeholder="문의하실 내용을 자세히 입력해주시면 신속히 답변 드리겠습니다." required></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="inquirySecret" checked>
+                        <label class="form-check-label small text-secondary" for="inquirySecret">
+                            비밀글로 등록 (작성자와 관리자만 확인 가능)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-dark rounded-pill px-4 fw-semibold">등록하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

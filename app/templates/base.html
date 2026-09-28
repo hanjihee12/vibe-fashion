@@ -48,24 +48,41 @@
 
                 <!-- 네비게이션 메뉴 목록 -->
                 <div class="collapse navbar-collapse" id="navbarContent">
-                    <ul class="navbar-nav me-auto mb-2 mb-lg-0 fw-semibold ms-lg-4">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0 fw-semibold ms-lg-4 gap-lg-1">
                         <li class="nav-item">
-                            <a class="nav-link active text-dark" href="{{ url_for('main.index') }}">홈</a>
+                            <a class="nav-link active text-dark d-flex align-items-center gap-1" href="{{ url_for('main.index') }}">
+                                <i class="bi bi-house-door-fill text-dark"></i>홈
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-secondary" href="#products-section">베스트</a>
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#products-section">
+                                <i class="bi bi-fire text-danger"></i>베스트
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-secondary" href="#products-section">신상품</a>
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#products-section">
+                                <i class="bi bi-sparkles text-warning"></i>신상품
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-secondary" href="#products-section">아우터</a>
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#products-section">
+                                <i class="bi bi-layers text-primary"></i>아우터
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-secondary" href="#products-section">상의/하의</a>
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#products-section">
+                                <i class="bi bi-columns-gap text-success"></i>상의/하의
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-secondary" href="#products-section">액세서리</a>
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#products-section">
+                                <i class="bi bi-gem text-info"></i>악세사리
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-secondary d-flex align-items-center gap-1" href="#inquiry-section">
+                                <i class="bi bi-chat-square-text-fill text-dark"></i>문의게시판
+                            </a>
                         </li>
                     </ul>
 

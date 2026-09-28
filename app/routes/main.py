@@ -97,11 +97,11 @@ def get_featured_products():
     - 조건: is_active=true AND is_featured=true, 최대 4개
     - 가격 포맷: {:,}원 형태 (예: 19,900원)
     - 이미지: product_images 테이블의 대표 썸네일(is_thumbnail) 연동
-    - 에러 처리: 연결 실패 시 빈 리스트([]) 반환 및 터미널 에러 로그 출력
+    - 에러 처리: 연결 실패 또는 데이터 부재 시 DUMMY_PRODUCTS로 fallback
     """
     if not supabase:
-        print("[ERROR] Supabase 클라이언트가 초기화되지 않았습니다. 빈 목록을 반환합니다.", file=sys.stderr)
-        return []
+        print("[WARN] Supabase 클라이언트가 초기화되지 않았습니다. 기본 더미 상품 데이터를 반환합니다.", file=sys.stderr)
+        return DUMMY_PRODUCTS
 
     try:
         response = (
@@ -156,13 +156,13 @@ def get_featured_products():
                 'is_featured': item.get('is_featured', True)
             })
 
-        return products
+        return products if products else DUMMY_PRODUCTS
 
     except Exception as e:
-        # Supabase 연결/조회 실패 시 앱이 종료되지 않도록 예외 처리 및 로그 출력
+        # Supabase 연결/조회 실패 시 앱이 종료되지 않도록 예외 처리 및 DUMMY_PRODUCTS 반환
         print(f"[ERROR] Supabase products 테이블 조회 실패: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        return []
+        return DUMMY_PRODUCTS
 
 
 @main_bp.route('/')
