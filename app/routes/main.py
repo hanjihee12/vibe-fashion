@@ -87,6 +87,48 @@ DUMMY_TOP_PRODUCTS = [
         "description": "탄탄한 헤비 웨이트 쮸리 원단으로 제작되어 흐트러짐 없는 스트릿 무드 후디",
         "rating": 4.7,
         "reviews": 64
+    },
+    {
+        "id": "top-5",
+        "name": "어텀 캐시미어 블렌드 가디건",
+        "category": "상의",
+        "price": "79,000원",
+        "price_str": "79,000원",
+        "badge": "FALL NEW",
+        "badge_color": "warning text-dark",
+        "thumbnail_url": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
+        "description": "가을 무드를 완성하는 차분한 카멜 톤과 부드러운 캐시미어 블렌드 루즈핏 가디건",
+        "rating": 4.9,
+        "reviews": 110
+    },
+    {
+        "id": "top-6",
+        "name": "브라운 스웨이드 오버 셔켓",
+        "category": "상의",
+        "price": "89,000원",
+        "price_str": "89,000원",
+        "badge": "AUTUMN",
+        "badge_color": "danger",
+        "thumbnail_url": "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=800&auto=format&fit=crop&q=80",
+        "description": "고급스러운 인조 스웨이드 텍스처로 셔츠와 자켓 겸용으로 연출하는 가을 아우터 셔츠",
+        "rating": 4.8,
+        "reviews": 73
+    },
+    {
+        "id": "top-7",
+        "name": "웜 하프 터틀넥 골지 니트",
+        "category": "상의",
+        "price": "46,000원",
+        "price_str": "46,000원",
+        "badge": "SEASON",
+        "badge_color": "secondary",
+        "thumbnail_url": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80",
+        "description": "찬 바람을 막아주는 포근한 하프 터틀넥과 신축성 좋은 립 골지 짜임의 가을 이너 니트",
+        "rating": 4.9,
+        "reviews": 134
     }
 ]
 
@@ -146,6 +188,48 @@ DUMMY_BOTTOM_PRODUCTS = [
         "description": "사이드 입체 카고 포켓과 밑단 밴딩으로 스포티하고 편안한 활동성을 제공",
         "rating": 4.8,
         "reviews": 112
+    },
+    {
+        "id": "bot-5",
+        "name": "어텀 딥카키 와이드 코듀로이 팬츠",
+        "category": "하의",
+        "price": "52,000원",
+        "price_str": "52,000원",
+        "badge": "FALL NEW",
+        "badge_color": "warning text-dark",
+        "thumbnail_url": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=800&auto=format&fit=crop&q=80",
+        "description": "도톰한 골덴 원단과 깊이 있는 카키 컬러감으로 가을·초겨울 시즌 최적의 무드를 주는 팬츠",
+        "rating": 4.9,
+        "reviews": 84
+    },
+    {
+        "id": "bot-6",
+        "name": "클래식 헤링본 울 테이퍼드 슬랙스",
+        "category": "하의",
+        "price": "68,000원",
+        "price_str": "68,000원",
+        "badge": "CLASSIC",
+        "badge_color": "secondary",
+        "thumbnail_url": "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800&auto=format&fit=crop&q=80",
+        "description": "은은한 헤링본 패턴의 울 혼방 소재로 클래식하고 포멀한 가을 룩북 연출 슬랙스",
+        "rating": 4.8,
+        "reviews": 59
+    },
+    {
+        "id": "bot-7",
+        "name": "다크 브라운 스트레이트 카펜터 팬츠",
+        "category": "하의",
+        "price": "56,000원",
+        "price_str": "56,000원",
+        "badge": "AUTUMN",
+        "badge_color": "danger",
+        "thumbnail_url": "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&auto=format&fit=crop&q=80",
+        "description": "가을 감성의 딥 브라운 컬러에 해머 루프와 툴 포켓 디테일이 돋보이는 워크웨어 팬츠",
+        "rating": 4.9,
+        "reviews": 97
     }
 ]
 

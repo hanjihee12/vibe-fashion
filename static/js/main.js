@@ -67,14 +67,27 @@ function toggleWishlist(btn) {
 }
 
 /**
- * 문의글 답변 내용 토글 함수
+ * 문의글 답변 내용 토글 함수 (비밀글인 경우 비밀번호 확인)
  * @param {HTMLElement} element - 클릭된 제목 링크
  */
 function toggleInquiryDetail(element) {
     const answerDiv = element.nextElementSibling;
-    if (answerDiv) {
-        answerDiv.classList.toggle('d-none');
+    if (!answerDiv) return;
+
+    const postPassword = answerDiv.dataset.pwd;
+    if (postPassword) {
+        if (!answerDiv.classList.contains('d-none')) {
+            answerDiv.classList.add('d-none');
+            return;
+        }
+        const inputPw = prompt('비밀글입니다. 작성 시 등록한 비밀번호를 입력해주세요:');
+        if (inputPw === null) return;
+        if (inputPw !== postPassword) {
+            alert('비밀번호가 일치하지 않습니다.');
+            return;
+        }
     }
+    answerDiv.classList.toggle('d-none');
 }
 
 /**
@@ -86,12 +99,18 @@ function submitInquiry(event) {
 
     const category = document.getElementById('inquiryCategory').value;
     const author = document.getElementById('inquiryAuthor').value.trim();
+    const password = document.getElementById('inquiryPassword') ? document.getElementById('inquiryPassword').value.trim() : '';
     const title = document.getElementById('inquiryTitle').value.trim();
     const content = document.getElementById('inquiryContent').value.trim();
     const isSecret = document.getElementById('inquirySecret').checked;
 
     if (!author || !title || !content) {
         alert('모든 필드를 입력해주세요.');
+        return;
+    }
+
+    if (!password || password.length < 4) {
+        alert('비밀번호를 4자리 이상 입력해주세요.');
         return;
     }
 
@@ -116,8 +135,17 @@ function submitInquiry(event) {
                 <a href="javascript:void(0)" class="text-decoration-none text-dark fw-semibold" onclick="toggleInquiryDetail(this)">
                     ${isSecret ? '<i class="bi bi-lock-fill text-muted me-1"></i>' : ''} ${title}
                 </a>
-                <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none">
+                <div class="inquiry-answer text-muted small mt-2 p-3 bg-light rounded d-none" ${isSecret ? `data-pwd="${password}"` : ''}>
                     <p class="mb-1 text-dark"><strong>[문의내용]</strong> ${content}</p>
+                    <i class="bi bi-clock-history me-1 text-warning"></i><em>담당자가 내용을 확인 중입니다. 곧 답변이 등록됩니다.</em>
+                </div>
+            </td>
+            <td class="text-secondary">${maskedAuthor}</td>
+            <td class="text-secondary small">${today}</td>
+            <td><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">답변대기</span></td>
+        `;
+        tableBody.insertBefore(newRow, tableBody.firstChild);
+    }
                     <i class="bi bi-clock-history me-1 text-warning"></i><em>담당자가 내용을 확인 중입니다. 곧 답변이 등록됩니다.</em>
                 </div>
             </td>
