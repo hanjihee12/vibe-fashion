@@ -54,8 +54,8 @@ DUMMY_TOP_PRODUCTS = [
         "price_str": "59,000원",
         "badge": "10% OFF",
         "badge_color": "success",
-        "thumbnail_url": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800&auto=format&fit=crop&q=80",
+        "thumbnail_url": "https://images.unsplash.com/photo-1564557287817-3785e38ec1f5?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1564557287817-3785e38ec1f5?w=800&auto=format&fit=crop&q=80",
         "description": "탄탄한 헤비 웨이트 쮸리 원단으로 제작되어 흐트러짐 없는 스트릿 무드 후디",
         "rating": 4.7,
         "reviews": 64
