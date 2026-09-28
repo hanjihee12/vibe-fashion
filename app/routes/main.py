@@ -33,20 +33,6 @@ main_bp = Blueprint('main', __name__)
 # 카테고리별 고화질 더미 상품 데이터 (상의, 하의, 악세사리)
 DUMMY_TOP_PRODUCTS = [
     {
-        "id": "top-1",
-        "name": "베이직 코튼 크롭 티셔츠",
-        "category": "상의",
-        "price": "19,900원",
-        "price_str": "19,900원",
-        "badge": "BEST",
-        "badge_color": "danger",
-        "thumbnail_url": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&auto=format&fit=crop&q=80",
-        "description": "트렌디한 실루엣과 부드러운 코튼 100% 원단으로 완성한 데일리 크롭 티셔츠",
-        "rating": 4.9,
-        "reviews": 142
-    },
-    {
         "id": "top-2",
         "name": "클래식 릴렉스드 옥스포드 셔츠",
         "category": "상의",
@@ -61,20 +47,6 @@ DUMMY_TOP_PRODUCTS = [
         "reviews": 95
     },
     {
-        "id": "top-3",
-        "name": "미니멀 라운드넥 니트 스웨터",
-        "category": "상의",
-        "price": "54,000원",
-        "price_str": "54,000원",
-        "badge": "HOT",
-        "badge_color": "warning text-dark",
-        "thumbnail_url": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
-        "description": "부드럽고 촘촘한 조직감으로 포근한 실루엣을 연출해주는 데일리 니트",
-        "rating": 4.9,
-        "reviews": 88
-    },
-    {
         "id": "top-4",
         "name": "시그니처 오버핏 후드 티셔츠",
         "category": "상의",
@@ -82,8 +54,8 @@ DUMMY_TOP_PRODUCTS = [
         "price_str": "59,000원",
         "badge": "10% OFF",
         "badge_color": "success",
-        "thumbnail_url": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80",
+        "thumbnail_url": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=800&auto=format&fit=crop&q=80",
         "description": "탄탄한 헤비 웨이트 쮸리 원단으로 제작되어 흐트러짐 없는 스트릿 무드 후디",
         "rating": 4.7,
         "reviews": 64
@@ -133,20 +105,6 @@ DUMMY_TOP_PRODUCTS = [
 ]
 
 DUMMY_BOTTOM_PRODUCTS = [
-    {
-        "id": "bot-1",
-        "name": "내추럴 와이드 핏 데님 팬츠",
-        "category": "하의",
-        "price": "39,900원",
-        "price_str": "39,900원",
-        "badge": "BEST",
-        "badge_color": "danger",
-        "thumbnail_url": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80",
-        "description": "자연스러운 워싱감과 트렌디한 와이드 핏으로 감각적인 룩을 완성하는 데님",
-        "rating": 4.9,
-        "reviews": 210
-    },
     {
         "id": "bot-2",
         "name": "와이드 핏 투턱 세미 슬랙스",
@@ -370,11 +328,19 @@ def get_categorized_products():
     bottom_list = [p for p in products if classify_category(p.get('category', ''), p.get('name', '')) == 'bottom']
     acc_list = [p for p in products if classify_category(p.get('category', ''), p.get('name', '')) == 'acc']
 
-    # 각 카테고리가 비어있거나 부족할 경우 고화질 더미 상품으로 보강
-    final_top = top_list if top_list else DUMMY_TOP_PRODUCTS
-    final_bottom = bottom_list if bottom_list else DUMMY_BOTTOM_PRODUCTS
-    final_acc = acc_list if acc_list else DUMMY_ACC_PRODUCTS
-    all_products = (products if products else DUMMY_PRODUCTS)
+    # Supabase 데이터와 가을 신상품 더미 데이터를 병합하여 항상 풍성하게 노출
+    def merge_products(db_list, dummy_list):
+        existing_names = {p['name'] for p in db_list}
+        merged = list(db_list)
+        for item in dummy_list:
+            if item['name'] not in existing_names:
+                merged.append(item)
+        return merged
+
+    final_top = merge_products(top_list, DUMMY_TOP_PRODUCTS)
+    final_bottom = merge_products(bottom_list, DUMMY_BOTTOM_PRODUCTS)
+    final_acc = merge_products(acc_list, DUMMY_ACC_PRODUCTS)
+    all_products = final_top + final_bottom + final_acc
 
     return {
         'all': all_products,
