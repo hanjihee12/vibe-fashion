@@ -92,12 +92,13 @@
                                 2
                             </span>
                         </a>
-                        <a href="#products-section" class="btn btn-dark position-relative rounded-circle p-2" title="장바구니" id="cartButton">
-                            <i class="bi bi-bag fs-5 text-white"></i>
-                            <span id="cartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        <button type="button" class="btn btn-dark position-relative rounded-pill px-3 py-2 d-flex align-items-center gap-2 shadow-sm" title="장바구니 확인 및 주문하기" id="cartButton" onclick="openCartModal()">
+                            <i class="bi bi-bag-check-fill fs-5 text-white"></i>
+                            <span class="fw-bold d-none d-sm-inline">장바구니</span>
+                            <span id="cartCount" class="badge rounded-pill bg-danger">
                                 0
                             </span>
-                        </a>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -180,6 +181,213 @@
 
     <!-- 5. Bootstrap 5.3 CDN (JavaScript 번들) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <!-- [1. 장바구니 모달] -->
+    <div class="modal fade" id="cartModal" tabindex="-1" aria-labelledby="cartModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header border-bottom pb-3">
+                    <h5 class="modal-title fw-bold" id="cartModalLabel">
+                        <i class="bi bi-bag-check-fill text-dark me-2"></i>내 장바구니
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- 장바구니 빈 상태 안내 -->
+                    <div id="cartModalEmpty" class="text-center py-5 d-none">
+                        <i class="bi bi-cart-x text-muted fs-1 mb-3 d-block"></i>
+                        <h6 class="fw-bold text-dark mb-1">장바구니가 비어 있습니다</h6>
+                        <p class="text-secondary small mb-3">마음에 드는 상품을 담아보세요!</p>
+                        <a href="#products-section" class="btn btn-outline-dark btn-sm rounded-pill px-4" data-bs-dismiss="modal">쇼핑 계속하기</a>
+                    </div>
+
+                    <!-- 장바구니 담긴 아이템 목록 -->
+                    <div id="cartModalItems" class="mb-4"></div>
+
+                    <!-- 금액 합계 섹션 -->
+                    <div class="bg-light p-3 rounded-3 border">
+                        <div class="d-flex justify-content-between text-secondary small mb-2">
+                            <span>상품 금액</span>
+                            <span id="cartModalSubtotal" class="fw-semibold text-dark">0원</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-secondary small mb-2">
+                            <span>배송비 (5만원 이상 무료)</span>
+                            <span id="cartModalShipping" class="fw-semibold text-dark">0원</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold fs-6">총 결제 예정 금액</span>
+                            <span id="cartModalTotal" class="fw-bolder fs-4 text-danger">0원</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">계속 쇼핑하기</button>
+                    <button type="button" class="btn btn-dark rounded-pill px-4 fw-bold" id="cartModalOrderBtn" onclick="proceedToOrderModal()">
+                        <i class="bi bi-credit-card me-1"></i>주문하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- [2. 주문/배송 정보 입력 모달] -->
+    <div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header border-bottom pb-3">
+                    <h5 class="modal-title fw-bold" id="orderModalLabel">
+                        <i class="bi bi-receipt-cutoff text-dark me-2"></i>주문서 작성 및 배송 정보 입력
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="orderForm" onsubmit="submitOrder(event)">
+                    <div class="modal-body p-4">
+                        <!-- 주문 예정 상품 목록 요약 -->
+                        <div class="mb-4 p-3 bg-light rounded-3 border">
+                            <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-box-seam me-1 text-primary"></i>주문 상품 정보</h6>
+                            <div id="orderItemsSummary"></div>
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                <span class="fw-bold text-secondary small">총 결제 금액 (배송비 포함):</span>
+                                <span id="orderSummaryTotal" class="fw-bold fs-5 text-danger">0원</span>
+                            </div>
+                        </div>
+
+                        <!-- 주문자 및 배송지 정보 입력 -->
+                        <h6 class="fw-bold mb-3 text-dark"><i class="bi bi-truck me-1 text-success"></i>배송 및 주문자 정보</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">주문자 이름 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="orderBuyerName" placeholder="홍길동" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">아이디 (ID) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="orderBuyerId" placeholder="예: user2026" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">전화번호 <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="orderBuyerPhone" placeholder="010-1234-5678" pattern="[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}" required>
+                                <div class="form-text small">형식: 010-1234-5678</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">환불/입금 계좌 은행 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="orderRefundBank" required>
+                                    <option value="국민은행">국민은행</option>
+                                    <option value="신한은행">신한은행</option>
+                                    <option value="우리은행">우리은행</option>
+                                    <option value="하나은행">하나은행</option>
+                                    <option value="카카오뱅크">카카오뱅크</option>
+                                    <option value="토스뱅크">토스뱅크</option>
+                                    <option value="농협">농협</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">계좌번호 (환불/입금 확인용) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="orderRefundAccount" placeholder="계좌번호를 '-' 없이 또는 포함하여 입력해주세요" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">배송지 주소 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="orderBuyerAddress" placeholder="상세 주소를 포함하여 정확히 입력해주세요" required>
+                            </div>
+                        </div>
+
+                        <!-- 결제 수단 선택 -->
+                        <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-wallet2 me-1 text-warning"></i>결제 수단 선택</h6>
+                        <div class="d-flex gap-4 p-3 bg-light rounded-3 border">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="payBank" value="무통장입금" checked>
+                                <label class="form-check-label small fw-semibold" for="payBank">
+                                    무통장입금 (가상계좌)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="payCard" value="신용/체크카드">
+                                <label class="form-check-label small fw-semibold" for="payCard">
+                                    신용/체크카드
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="paySimple" value="간편결제">
+                                <label class="form-check-label small fw-semibold" for="paySimple">
+                                    카카오/네이버페이
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top-0 pt-0">
+                        <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">취소</button>
+                        <button type="submit" class="btn btn-dark rounded-pill px-5 fw-bold">
+                            <i class="bi bi-check2-circle me-1"></i>결제 및 주문 완료
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- [3. 주문 완료 상세 영수증 모달] -->
+    <div class="modal fade" id="orderCompleteModal" tabindex="-1" aria-labelledby="orderCompleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header border-bottom bg-success text-white py-3 rounded-top-4">
+                    <h5 class="modal-title fw-bold" id="orderCompleteModalLabel">
+                        <i class="bi bi-check-circle-fill me-2"></i>주문이 성공적으로 접수되었습니다!
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-success d-flex align-items-center gap-2 mb-4" role="alert">
+                        <i class="bi bi-bell-fill fs-5"></i>
+                        <div>
+                            주문이 안전하게 등록되었습니다. 아래 주문 및 배송 정보를 확인해 주세요.
+                        </div>
+                    </div>
+
+                    <!-- 주문 정보 표시 칸 -->
+                    <div class="card border mb-3 rounded-3 overflow-hidden shadow-sm">
+                        <div class="card-header bg-light fw-bold text-dark">
+                            <i class="bi bi-info-circle me-1 text-primary"></i>주문 기본 정보
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-2 small">
+                                <div class="col-sm-4 text-secondary">주문번호</div>
+                                <div class="col-sm-8 fw-bold text-dark" id="completeOrderNumber">-</div>
+                                <div class="col-sm-4 text-secondary">주문일시</div>
+                                <div class="col-sm-8 text-dark" id="completeOrderDate">-</div>
+                                <div class="col-sm-4 text-secondary">주문자 ID / 성함</div>
+                                <div class="col-sm-8 text-dark"><span id="completeBuyerId" class="fw-bold"></span> (<span id="completeBuyerName"></span>)</div>
+                                <div class="col-sm-4 text-secondary">연락처</div>
+                                <div class="col-sm-8 text-dark" id="completeBuyerPhone">-</div>
+                                <div class="col-sm-4 text-secondary">배송지 주소</div>
+                                <div class="col-sm-8 text-dark" id="completeBuyerAddress">-</div>
+                                <div class="col-sm-4 text-secondary">환불/입금 계좌</div>
+                                <div class="col-sm-8 text-dark" id="completeRefundAccount">-</div>
+                                <div class="col-sm-4 text-secondary">결제 수단</div>
+                                <div class="col-sm-8 text-dark" id="completePayMethod">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 주문한 물건 목록 칸 -->
+                    <div class="card border rounded-3 overflow-hidden shadow-sm mb-3">
+                        <div class="card-header bg-light fw-bold text-dark">
+                            <i class="bi bi-bag-check me-1 text-success"></i>주문한 물건 목록
+                        </div>
+                        <div class="card-body p-3">
+                            <ul class="list-group list-group-flush mb-0" id="completeItemsList"></ul>
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-2">
+                                <span class="fw-bold fs-6 text-dark">최종 결제 금액</span>
+                                <span id="completeTotalAmount" class="fw-bolder fs-4 text-danger">0원</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-dark rounded-pill px-5 fw-bold" data-bs-dismiss="modal">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 6. 커스텀 프론트엔드 자바스크립트 -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
