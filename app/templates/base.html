@@ -82,7 +82,17 @@
                     </ul>
 
                     <!-- 우측 상단 유저 액션 아이콘들 -->
-                    <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- 로그인/회원가입 사용자 상태 -->
+                        <div id="userAuthContainer" class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-semibold" onclick="openAuthModal('signup')">
+                                <i class="bi bi-person-plus me-1"></i>회원가입
+                            </button>
+                            <button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-semibold border" onclick="openAuthModal('login')">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>로그인
+                            </button>
+                        </div>
+
                         <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" type="button" onclick="alert('검색 기능은 준비 중입니다.')">
                             <i class="bi bi-search me-1"></i>검색
                         </button>
@@ -384,6 +394,107 @@
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
                     <button type="button" class="btn btn-dark rounded-pill px-5 fw-bold" data-bs-dismiss="modal">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- [4. 회원가입 및 로그인 모달] -->
+    <div class="modal fade" id="authModal" tabindex="-1" aria-labelledby="authModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg overflow-hidden">
+                <div class="modal-header border-bottom bg-light py-3">
+                    <ul class="nav nav-pills w-100 nav-justified" id="authTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-bold rounded-pill" id="signup-tab" data-bs-toggle="pill" data-bs-target="#signup-tab-pane" type="button" role="tab" aria-controls="signup-tab-pane" aria-selected="true">
+                                <i class="bi bi-person-plus-fill me-1"></i>회원가입
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold rounded-pill" id="login-tab" data-bs-toggle="pill" data-bs-target="#login-tab-pane" type="button" role="tab" aria-controls="login-tab-pane" aria-selected="false">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>로그인
+                            </button>
+                        </li>
+                    </ul>
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="tab-content" id="authTabContent">
+                        <!-- 회원가입 탭 폼 -->
+                        <div class="tab-pane fade show active" id="signup-tab-pane" role="tabpanel" aria-labelledby="signup-tab" tabindex="0">
+                            <form id="signupForm" onsubmit="handleSignup(event)">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">아이디 (ID) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                        <input type="text" class="form-control" id="signupId" placeholder="아이디(4자리 이상)" required minlength="4">
+                                    </div>
+                                    <div class="form-text small">영문, 숫자로 4자리 이상 입력해주세요.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">비밀번호 <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                        <input type="password" class="form-control" id="signupPassword" placeholder="비밀번호(4자리 이상)" required minlength="4">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">비밀번호 확인 <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-shield-lock"></i></span>
+                                        <input type="password" class="form-control" id="signupPasswordConfirm" placeholder="비밀번호 재입력" required minlength="4">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">이름 (성함) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-card-heading"></i></span>
+                                        <input type="text" class="form-control" id="signupName" placeholder="예: 홍길동" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">전화번호 <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-telephone"></i></span>
+                                        <input type="tel" class="form-control" id="signupPhone" placeholder="010-1234-5678" pattern="[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}" required>
+                                    </div>
+                                    <div class="form-text small">형식: 010-1234-5678</div>
+                                </div>
+                                <div class="form-check mb-4">
+                                    <input class="form-check-input" type="checkbox" id="signupAgree" checked required>
+                                    <label class="form-check-label small text-secondary" for="signupAgree">
+                                        [필수] 이용약관 및 개인정보 수집·이용 동의
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
+                                    <i class="bi bi-person-check-fill me-1"></i>회원가입 완료
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- 로그인 탭 폼 -->
+                        <div class="tab-pane fade" id="login-tab-pane" role="tabpanel" aria-labelledby="login-tab" tabindex="0">
+                            <form id="loginForm" onsubmit="handleLogin(event)">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold">아이디 (ID)</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                        <input type="text" class="form-control" id="loginId" placeholder="아이디를 입력하세요" required>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label small fw-semibold">비밀번호</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                                        <input type="password" class="form-control" id="loginPassword" placeholder="비밀번호를 입력하세요" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i>로그인
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

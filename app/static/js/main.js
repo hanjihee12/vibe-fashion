@@ -241,6 +241,17 @@ function proceedToOrderModal() {
     if (summaryShipping) summaryShipping.innerText = shipping === 0 ? '무료' : formatKRW(shipping);
     if (summaryTotal) summaryTotal.innerText = formatKRW(totalAmount);
 
+    // 로그인된 사용자 정보 자동 완성
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+        const nameInput = document.getElementById('orderBuyerName');
+        const idInput = document.getElementById('orderBuyerId');
+        const phoneInput = document.getElementById('orderBuyerPhone');
+        if (nameInput && !nameInput.value) nameInput.value = currentUser.name || '';
+        if (idInput && !idInput.value) idInput.value = currentUser.id || '';
+        if (phoneInput && !phoneInput.value) phoneInput.value = currentUser.phone || '';
+    }
+
     // 주문서 모달 열기
     const orderModalEl = document.getElementById('orderModal');
     if (orderModalEl && window.bootstrap) {
@@ -468,4 +479,215 @@ function submitInquiry(event) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[VIBE-FASHION] 프론트엔드 모듈이 성공적으로 로드되었습니다.');
     updateCartUI();
+    updateUserAuthUI();
 });
+
+/**
+ * 현재 로그인한 사용자 정보 반환
+ */
+function getCurrentUser() {
+    try {
+        const user = localStorage.getItem('vibe_current_user');
+        return user ? JSON.parse(user) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * 사용자 정보 목록 반환 (회원 목록)
+ */
+function getUsersList() {
+    try {
+        const users = localStorage.getItem('vibe_users');
+        return users ? JSON.parse(users) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+/**
+ * 로그인/회원가입 UI 갱신
+ */
+function updateUserAuthUI() {
+    const container = document.getElementById('userAuthContainer');
+    if (!container) return;
+
+    const user = getCurrentUser();
+    if (user) {
+        container.innerHTML = `
+            <div class="dropdown">
+                <button class="btn btn-outline-dark btn-sm rounded-pill px-3 dropdown-toggle fw-semibold" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-person-circle text-primary me-1"></i><strong>${user.name}</strong>님
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-1">
+                    <li class="px-3 py-1 small text-muted">ID: ${user.id}</li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="handleLogout()"><i class="bi bi-box-arrow-right me-1"></i>로그아웃</a></li>
+                </ul>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-semibold" onclick="openAuthModal('signup')">
+                <i class="bi bi-person-plus me-1"></i>회원가입
+            </button>
+            <button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-semibold border" onclick="openAuthModal('login')">
+                <i class="bi bi-box-arrow-in-right me-1"></i>로그인
+            </button>
+        `;
+    }
+}
+
+/**
+ * 로그인/회원가입 모달 열기
+ * @param {'signup'|'login'} mode - 열 탭 모드
+ */
+function openAuthModal(mode = 'signup') {
+    const modalEl = document.getElementById('authModal');
+    if (!modalEl || !window.bootstrap) return;
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    if (mode === 'signup') {
+        const signupTab = document.getElementById('signup-tab');
+        if (signupTab) {
+            const tab = bootstrap.Tab.getOrCreateInstance(signupTab);
+            tab.show();
+        }
+    } else {
+        const loginTab = document.getElementById('login-tab');
+        if (loginTab) {
+            const tab = bootstrap.Tab.getOrCreateInstance(loginTab);
+            tab.show();
+        }
+    }
+}
+
+/**
+ * 회원가입 제출 처리
+ */
+function handleSignup(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('signupId').value.trim();
+    const pw = document.getElementById('signupPassword').value;
+    const pwConfirm = document.getElementById('signupPasswordConfirm').value;
+    const name = document.getElementById('signupName').value.trim();
+    const phone = document.getElementById('signupPhone').value.trim();
+
+    if (!id || !pw || !name || !phone) {
+        alert('필수 입력 항목을 모두 작성해주세요.');
+        return;
+    }
+
+    if (pw !== pwConfirm) {
+        alert('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
+        document.getElementById('signupPasswordConfirm').focus();
+        return;
+    }
+
+    const users = getUsersList();
+    if (users.some(u => u.id === id)) {
+        alert('이미 존재하는 아이디입니다. 다른 아이디를 입력해주세요.');
+        document.getElementById('signupId').focus();
+        return;
+    }
+
+    const newUser = { id, pw, name, phone, createdAt: new Date().toISOString() };
+    users.push(newUser);
+    try {
+        localStorage.setItem('vibe_users', JSON.stringify(users));
+        localStorage.setItem('vibe_current_user', JSON.stringify({ id, name, phone }));
+    } catch (e) {
+        console.error(e);
+    }
+
+    updateUserAuthUI();
+
+    // 모달 닫기 및 폼 리셋
+    const modalEl = document.getElementById('authModal');
+    if (modalEl && window.bootstrap) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+    document.getElementById('signupForm').reset();
+
+    // 토스트 환영 메시지
+    const toastMessage = document.getElementById('toastMessage');
+    if (toastMessage) {
+        toastMessage.innerHTML = `🎉 <strong>${name}</strong>님, VIBE-FASHION 회원가입을 환영합니다! (10% 웰컴 쿠폰 발급 완료)`;
+    }
+    const toastElement = document.getElementById('cartToast');
+    if (toastElement && window.bootstrap) {
+        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+        toastInstance.show();
+    }
+}
+
+/**
+ * 로그인 제출 처리
+ */
+function handleLogin(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('loginId').value.trim();
+    const pw = document.getElementById('loginPassword').value;
+
+    const users = getUsersList();
+    const matched = users.find(u => u.id === id && u.pw === pw);
+
+    if (!matched) {
+        alert('아이디 또는 비밀번호가 일치하지 않습니다.');
+        return;
+    }
+
+    try {
+        localStorage.setItem('vibe_current_user', JSON.stringify({ id: matched.id, name: matched.name, phone: matched.phone }));
+    } catch (e) {
+        console.error(e);
+    }
+
+    updateUserAuthUI();
+
+    // 모달 닫기 및 폼 리셋
+    const modalEl = document.getElementById('authModal');
+    if (modalEl && window.bootstrap) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+    document.getElementById('loginForm').reset();
+
+    // 토스트 환영 메시지
+    const toastMessage = document.getElementById('toastMessage');
+    if (toastMessage) {
+        toastMessage.innerHTML = `👋 <strong>${matched.name}</strong>님, 환영합니다!`;
+    }
+    const toastElement = document.getElementById('cartToast');
+    if (toastElement && window.bootstrap) {
+        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+        toastInstance.show();
+    }
+}
+
+/**
+ * 로그아웃 처리
+ */
+function handleLogout() {
+    try {
+        localStorage.removeItem('vibe_current_user');
+    } catch (e) {}
+
+    updateUserAuthUI();
+
+    const toastMessage = document.getElementById('toastMessage');
+    if (toastMessage) {
+        toastMessage.innerHTML = '로그아웃되었습니다.';
+    }
+    const toastElement = document.getElementById('cartToast');
+    if (toastElement && window.bootstrap) {
+        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+        toastInstance.show();
+    }
+}
