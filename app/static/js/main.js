@@ -547,6 +547,9 @@ function openAuthModal(mode = 'signup') {
     const modalEl = document.getElementById('authModal');
     if (!modalEl || !window.bootstrap) return;
 
+    // 모달 열 때 폼 상태 초기화
+    resetSignupForm();
+
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.show();
 
@@ -566,19 +569,48 @@ function openAuthModal(mode = 'signup') {
 }
 
 /**
- * 회원가입 제출 처리
+ * 회원가입 폼 상태 초기화 (메일 발송 화면 -> 입력 폼 복원)
  */
-function handleSignup(event) {
+function resetSignupForm() {
+    const form = document.getElementById('signupForm');
+    const sentPane = document.getElementById('signupSentPane');
+    if (form) {
+        form.classList.remove('d-none');
+    }
+    if (sentPane) {
+        sentPane.classList.add('d-none');
+    }
+}
+
+/**
+ * 회원가입 제출 처리 (이메일 인증 링크 발송)
+ */
+async function handleSignup(event) {
     event.preventDefault();
 
-    const id = document.getElementById('signupId').value.trim();
+    const emailInput = document.getElementById('signupEmail');
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
     const pw = document.getElementById('signupPassword').value;
     const pwConfirm = document.getElementById('signupPasswordConfirm').value;
     const name = document.getElementById('signupName').value.trim();
     const phone = document.getElementById('signupPhone').value.trim();
+    const agree = document.getElementById('signupAgree');
 
-    if (!id || !pw || !name || !phone) {
+    if (!email || !pw || !name || !phone) {
         alert('필수 입력 항목을 모두 작성해주세요.');
+        return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        alert('올바른 이메일 주소 형식을 입력해주세요 (예: user@example.com).');
+        if (emailInput) emailInput.focus();
+        return;
+    }
+
+    if (pw.length < 4) {
+        alert('비밀번호는 최소 4자리 이상 입력해주세요.');
+        document.getElementById('signupPassword').focus();
         return;
     }
 
@@ -588,41 +620,79 @@ function handleSignup(event) {
         return;
     }
 
-    const users = getUsersList();
-    if (users.some(u => u.id === id)) {
-        alert('이미 존재하는 아이디입니다. 다른 아이디를 입력해주세요.');
-        document.getElementById('signupId').focus();
+    if (agree && !agree.checked) {
+        alert('이용약관 및 개인정보 수집·이용에 동의해주세요.');
         return;
     }
 
-    const newUser = { id, pw, name, phone, createdAt: new Date().toISOString() };
-    users.push(newUser);
+    const users = getUsersList();
+    if (users.some(u => (u.email && u.email.toLowerCase() === email) || (u.id && u.id.toLowerCase() === email))) {
+        alert('이미 가입된 이메일 주소입니다. 로그인해주세요.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('signupSubmitBtn');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>가입 링크 메일 발송 중...';
+    }
+
     try {
-        localStorage.setItem('vibe_users', JSON.stringify(users));
-        localStorage.setItem('vibe_current_user', JSON.stringify({ id, name, phone }));
-    } catch (e) {
-        console.error(e);
-    }
+        const response = await fetch('/auth/send-signup-link', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: email,
+                password: pw,
+                name: name,
+                phone: phone
+            })
+        });
 
-    updateUserAuthUI();
+        const result = await response.json();
 
-    // 모달 닫기 및 폼 리셋
-    const modalEl = document.getElementById('authModal');
-    if (modalEl && window.bootstrap) {
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-    }
-    document.getElementById('signupForm').reset();
+        if (response.ok && result.success) {
+            // 폼 숨기고 발송 완료 화면 노출
+            const signupForm = document.getElementById('signupForm');
+            const sentPane = document.getElementById('signupSentPane');
+            const sentEmailDisplay = document.getElementById('sentEmailDisplay');
+            const previewVerifyLink = document.getElementById('previewVerifyLink');
 
-    // 토스트 환영 메시지
-    const toastMessage = document.getElementById('toastMessage');
-    if (toastMessage) {
-        toastMessage.innerHTML = `🎉 <strong>${name}</strong>님, VIBE-FASHION 회원가입을 환영합니다! (10% 웰컴 쿠폰 발급 완료)`;
-    }
-    const toastElement = document.getElementById('cartToast');
-    if (toastElement && window.bootstrap) {
-        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
-        toastInstance.show();
+            if (sentEmailDisplay) {
+                sentEmailDisplay.textContent = email;
+            }
+
+            if (previewVerifyLink && result.verify_url) {
+                previewVerifyLink.href = result.verify_url;
+            }
+
+            if (signupForm) signupForm.classList.add('d-none');
+            if (sentPane) sentPane.classList.remove('d-none');
+
+            // 토스트 알림
+            const toastMessage = document.getElementById('toastMessage');
+            if (toastMessage) {
+                toastMessage.innerHTML = `✉️ <strong>${email}</strong>으로 가입 링크 메일이 발송되었습니다.`;
+            }
+            const toastElement = document.getElementById('cartToast');
+            if (toastElement && window.bootstrap) {
+                const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+                toastInstance.show();
+            }
+        } else {
+            alert(result.message || '가입 인증 메일 발송에 실패했습니다. 다시 시도해주세요.');
+        }
+    } catch (error) {
+        console.error('가입 인증 메일 발송 오류:', error);
+        alert('서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+        }
     }
 }
 
@@ -632,19 +702,28 @@ function handleSignup(event) {
 function handleLogin(event) {
     event.preventDefault();
 
-    const id = document.getElementById('loginId').value.trim();
+    const id = document.getElementById('loginId').value.trim().toLowerCase();
     const pw = document.getElementById('loginPassword').value;
 
     const users = getUsersList();
-    const matched = users.find(u => u.id === id && u.pw === pw);
+    const matched = users.find(u => {
+        const uId = (u.id || '').toLowerCase();
+        const uEmail = (u.email || '').toLowerCase();
+        return (uId === id || uEmail === id) && u.pw === pw;
+    });
 
     if (!matched) {
-        alert('아이디 또는 비밀번호가 일치하지 않습니다.');
+        alert('이메일(아이디) 또는 비밀번호가 일치하지 않습니다.');
         return;
     }
 
     try {
-        localStorage.setItem('vibe_current_user', JSON.stringify({ id: matched.id, name: matched.name, phone: matched.phone }));
+        localStorage.setItem('vibe_current_user', JSON.stringify({
+            id: matched.id || matched.email,
+            email: matched.email || matched.id,
+            name: matched.name,
+            phone: matched.phone
+        }));
     } catch (e) {
         console.error(e);
     }

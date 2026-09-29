@@ -422,14 +422,15 @@
                     <div class="tab-content" id="authTabContent">
                         <!-- 회원가입 탭 폼 -->
                         <div class="tab-pane fade show active" id="signup-tab-pane" role="tabpanel" aria-labelledby="signup-tab" tabindex="0">
+                            <!-- 1단계: 회원가입 정보 입력 폼 -->
                             <form id="signupForm" onsubmit="handleSignup(event)">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">아이디 (ID) <span class="text-danger">*</span></label>
+                                    <label class="form-label small fw-semibold">이메일 주소 (ID) <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                                        <input type="text" class="form-control" id="signupId" placeholder="아이디(4자리 이상)" required minlength="4">
+                                        <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" class="form-control" id="signupEmail" placeholder="example@email.com" required>
                                     </div>
-                                    <div class="form-text small">영문, 숫자로 4자리 이상 입력해주세요.</div>
+                                    <div class="form-text small text-primary"><i class="bi bi-info-circle me-1"></i>입력하신 이메일로 가입 링크가 발송됩니다.</div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-semibold">비밀번호 <span class="text-danger">*</span></label>
@@ -466,18 +467,55 @@
                                         [필수] 이용약관 및 개인정보 수집·이용 동의
                                     </label>
                                 </div>
-                                <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
-                                    <i class="bi bi-person-check-fill me-1"></i>회원가입 완료
+                                <button type="submit" id="signupSubmitBtn" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
+                                    <i class="bi bi-envelope-check-fill me-1"></i>가입 인증 메일 발송
                                 </button>
                             </form>
+
+                            <!-- 2단계: 메일 발송 완료 안내 화면 -->
+                            <div id="signupSentPane" class="d-none text-center py-2">
+                                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary p-3 mb-3" style="width: 72px; height: 72px;">
+                                    <i class="bi bi-envelope-paper-heart" style="font-size: 2.2rem;"></i>
+                                </div>
+                                <h5 class="fw-bold mb-2">가입 인증 메일을 보냈습니다!</h5>
+                                <p class="text-secondary small mb-3">
+                                    <strong id="sentEmailDisplay" class="text-dark bg-light px-2 py-1 rounded border">user@example.com</strong> 으로<br>
+                                    가입 링크가 포함된 인증 메일이 발송되었습니다.
+                                </p>
+                                <div class="alert alert-info py-2 px-3 small rounded-3 mb-3 text-start">
+                                    <i class="bi bi-shield-lock-fill me-1"></i>메일함에 도착한 <strong>[회원가입 완료하기]</strong> 링크를 누르시면 가입이 최종 완료됩니다. (24시간 유효)
+                                </div>
+
+                                <!-- 개발/테스트용 빠른 인증 버튼 -->
+                                <div id="devVerifyLinkCard" class="bg-light border rounded-3 p-3 text-start small mb-3">
+                                    <div class="fw-semibold text-muted mb-1"><i class="bi bi-link-45deg me-1"></i>테스트용 가입 링크 (개발 모드):</div>
+                                    <p class="text-secondary mb-2" style="font-size: 11px;">실제 메일함 확인 외에도 아래 버튼을 눌러 즉시 가입 인증을 완료할 수 있습니다.</p>
+                                    <a href="#" id="previewVerifyLink" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold w-100">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>가입 링크 바로 열기 (완료하기)
+                                    </a>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary w-100 py-2 rounded-pill small fw-semibold" onclick="resetSignupForm()">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i>다시 입력하기
+                                    </button>
+                                    <button type="button" class="btn btn-dark w-100 py-2 rounded-pill small fw-semibold" data-bs-dismiss="modal">
+                                        닫기
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- 로그인 탭 폼 -->
                         <div class="tab-pane fade" id="login-tab-pane" role="tabpanel" aria-labelledby="login-tab" tabindex="0">
                             <form id="loginForm" onsubmit="handleLogin(event)">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">아이디 (ID)</label>
+                                    <label class="form-label small fw-semibold">이메일 또는 아이디 (ID)</label>
                                     <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                                        <input type="text" class="form-control" id="loginId" placeholder="이메일 또는 아이디를 입력하세요" required>
+                                    </div>
+                                </div>
                                         <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
                                         <input type="text" class="form-control" id="loginId" placeholder="아이디를 입력하세요" required>
                                     </div>

@@ -39,13 +39,19 @@ def create_app(test_config=None):
         DEBUG=os.getenv('FLASK_DEBUG', '1') == '1'
     )
 
+    # 리버스 프록시(Azure App Service 등) 환경에서 올바른 scheme(https) 및 host를 인식하도록 설정
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # 테스트 설정이 전달된 경우 덮어씌웁니다.
     if test_config:
         app.config.from_mapping(test_config)
 
     # 4. 라우트(Blueprint) 등록
-    # routes 폴더의 main_bp(메인 블루프린트)를 앱에 등록합니다.
+    # routes 폴더의 main_bp(메인 블루프린트) 및 auth_bp를 앱에 등록합니다.
     from .routes.main import main_bp
+    from .routes.auth import auth_bp
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
 
     return app

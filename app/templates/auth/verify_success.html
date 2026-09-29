@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}회원가입 완료 - {{ mall_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden text-center p-4 p-md-5">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success p-4 mb-3" style="width: 88px; height: 88px;">
+                        <i class="bi bi-patch-check-fill" style="font-size: 3rem;"></i>
+                    </div>
+                    <h2 class="fw-bold mb-2">이메일 인증 및 가입 완료!</h2>
+                    <p class="text-secondary small">VIBE-FASHION 가족이 되신 것을 진심으로 환영합니다.</p>
+                </div>
+
+                <div class="bg-light rounded-4 p-3 mb-4 text-start small">
+                    <div class="d-flex justify-content-between py-1 border-bottom">
+                        <span class="text-muted">이름 (성함)</span>
+                        <strong class="text-dark">{{ user.name }} 님</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom">
+                        <span class="text-muted">인증 이메일(ID)</span>
+                        <span class="text-dark fw-semibold">{{ user.email }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span class="text-muted">가입 혜택</span>
+                        <span class="badge bg-danger-subtle text-danger fw-bold">10% 웰컴 쿠폰 지급 완료</span>
+                    </div>
+                </div>
+
+                <div class="alert alert-primary py-2 px-3 small rounded-3 mb-4 d-flex align-items-center justify-content-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span><strong id="countdown">3</strong>초 후 메인 쇼핑몰로 자동 이동합니다...</span>
+                </div>
+
+                <a href="/" class="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm">
+                    <i class="bi bi-bag-heart-fill me-1"></i>지금 쇼핑 시작하기
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 브라우저의 localStorage 동기화 (기존 메인 쇼핑몰 프론트엔드 호환)
+    (function syncUserAuth() {
+        try {
+            const newUser = {
+                id: {{ user.email | tojson }},
+                email: {{ user.email | tojson }},
+                name: {{ user.name | tojson }},
+                phone: {{ user.phone | tojson }},
+                createdAt: new Date().toISOString()
+            };
+
+            // 1. 기존 유저 목록 불러오기
+            let users = [];
+            try {
+                const stored = localStorage.getItem('vibe_users');
+                if (stored) users = JSON.parse(stored);
+            } catch (e) {
+                users = [];
+            }
+
+            // 2. 이미 존재하는지 확인 후 추가/갱신
+            const index = users.findIndex(u => u.email === newUser.email || u.id === newUser.id);
+            if (index >= 0) {
+                users[index] = { ...users[index], ...newUser };
+            } else {
+                users.push(newUser);
+            }
+            localStorage.setItem('vibe_users', JSON.stringify(users));
+
+            // 3. 현재 로그인 사용자 설정
+            localStorage.setItem('vibe_current_user', JSON.stringify({
+                id: newUser.id,
+                email: newUser.email,
+                name: newUser.name,
+                phone: newUser.phone
+            }));
+        } catch (err) {
+            console.error('로컬 스토리지 동기화 실패:', err);
+        }
+
+        // 카운트다운 후 메인으로 자동 이동
+        let seconds = 3;
+        const countdownEl = document.getElementById('countdown');
+        const interval = setInterval(() => {
+            seconds--;
+            if (countdownEl) countdownEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(interval);
+                window.location.href = '/';
+            }
+        }, 1000);
+    })();
+</script>
+{% endblock %}
