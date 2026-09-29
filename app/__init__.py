@@ -36,7 +36,9 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SECRET_KEY=os.getenv('SECRET_KEY', 'vibe-fashion-default-secret-key'),
         APP_NAME='VIBE-FASHION',
-        DEBUG=os.getenv('FLASK_DEBUG', '1') == '1'
+        DEBUG=os.getenv('FLASK_DEBUG', '1') == '1',
+        SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_HTTPONLY=True,
     )
 
     # 리버스 프록시(Azure App Service 등) 환경에서 올바른 scheme(https) 및 host를 인식하도록 설정

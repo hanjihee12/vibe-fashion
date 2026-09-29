@@ -55,6 +55,26 @@ def get_serializer():
     return URLSafeTimedSerializer(secret_key)
 
 
+def get_site_url():
+    """
+    현재 애플리케이션의 기본 사이트 URL을 반환합니다.
+    Azure App Service 및 리버스 프록시(HTTPS) 환경을 자동으로 감지합니다.
+    """
+    site_url = os.getenv("SITE_URL")
+    if site_url:
+        return site_url.rstrip("/")
+
+    # 리버스 프록시 / Azure 환경에서 HTTPS 감지
+    scheme = request.headers.get("X-Forwarded-Proto")
+    if not scheme:
+        if request.headers.get("X-ARR-SSL") or (request.host and "azurewebsites.net" in request.host):
+            scheme = "https"
+        else:
+            scheme = request.scheme or "http"
+
+    return f"{scheme}://{request.host}".rstrip("/")
+
+
 def get_smtp_accounts():
     """
     SMTP 계정 목록을 파싱합니다.
@@ -263,10 +283,7 @@ def send_signup_link():
     }
     token = serializer.dumps(token_payload, salt="email-signup")
 
-    site_url = os.getenv("SITE_URL")
-    if not site_url:
-        site_url = request.host_url.rstrip("/")
-
+    site_url = get_site_url()
     verify_url = f"{site_url}/auth/verify-signup?token={token}"
 
     # 1. Supabase Auth 회원가입 및 Supabase Custom SMTP 메일 발송 트리거
@@ -458,10 +475,7 @@ def kakao_login():
     """
     카카오톡 OAuth 소셜 로그인 인증 페이지로 리다이렉트합니다.
     """
-    site_url = os.getenv("SITE_URL")
-    if not site_url:
-        site_url = request.host_url.rstrip("/")
-
+    site_url = get_site_url()
     callback_url = f"{site_url}/auth/callback"
 
     try:
@@ -469,7 +483,7 @@ def kakao_login():
             return render_template(
                 "auth/verify_error.html",
                 error_title="카카오 로그인 오류",
-                error_message="Supabase 연동이 설정되지 않았습니다."
+                error_message="Supabase 연동이 설정되지 않았습니다. 서버 환경 변수를 확인해주세요."
             ), 500
 
         res = supabase.auth.sign_in_with_oauth({
@@ -478,6 +492,15 @@ def kakao_login():
                 "redirect_to": callback_url
             }
         })
+
+        # PKCE code_verifier를 Flask 세션에 안전하게 보관 (멀티 프로세스 / 워커 분산 환경 대응)
+        try:
+            verifier_key = f"{supabase.auth._storage_key}-code-verifier"
+            code_verifier = supabase.auth._storage.get_item(verifier_key)
+            if code_verifier:
+                session["oauth_code_verifier"] = code_verifier
+        except Exception as storage_err:
+            print(f"[WARN] code_verifier 세션 저장 경고: {storage_err}", file=sys.stderr)
 
         auth_url = getattr(res, "url", None)
         if auth_url:
@@ -515,7 +538,25 @@ def auth_callback():
     # 1. 서버 측 PKCE code 파라미터가 있는 경우
     if code and supabase:
         try:
-            res = supabase.auth.exchange_code_for_session({"auth_code": code})
+            # 세션에서 보관된 PKCE code_verifier 복원
+            code_verifier = session.pop("oauth_code_verifier", None)
+            if not code_verifier:
+                try:
+                    verifier_key = f"{supabase.auth._storage_key}-code-verifier"
+                    code_verifier = supabase.auth._storage.get_item(verifier_key)
+                except Exception:
+                    pass
+
+            exchange_params = {"auth_code": code}
+            if code_verifier:
+                exchange_params["code_verifier"] = code_verifier
+                try:
+                    verifier_key = f"{supabase.auth._storage_key}-code-verifier"
+                    supabase.auth._storage.set_item(verifier_key, code_verifier)
+                except Exception:
+                    pass
+
+            res = supabase.auth.exchange_code_for_session(exchange_params)
             user = res.user
             session_data = res.session
 
@@ -553,6 +594,10 @@ def auth_callback():
                 is_social=True
             )
         except Exception as e:
+            # 이미 세션이 수립되어 있는 경우 메인으로 이동
+            if session.get("user_id"):
+                return redirect("/")
+
             print(f"[ERROR] 카카오 OAuth 콜백 처리 오류: {e}", file=sys.stderr)
             return render_template(
                 "auth/verify_error.html",
