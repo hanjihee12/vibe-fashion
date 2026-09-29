@@ -260,12 +260,30 @@ def send_signup_link():
     token = serializer.dumps(token_payload, salt="email-signup")
 
     site_url = os.getenv("SITE_URL")
-    if site_url:
-        verify_url = f"{site_url.rstrip('/')}/auth/verify-signup?token={token}"
-    else:
-        verify_url = url_for("auth.verify_signup", token=token, _external=True)
+    if not site_url:
+        site_url = request.host_url.rstrip("/")
 
-    # 이메일 발송 (SMTP 또는 콘솔 링크 로깅)
+    verify_url = f"{site_url}/auth/verify-signup?token={token}"
+
+    # 1. Supabase Auth 회원가입 및 Supabase Custom SMTP 메일 발송 트리거
+    try:
+        if supabase:
+            supabase.auth.sign_up({
+                "email": email,
+                "password": password,
+                "options": {
+                    "email_redirect_to": f"{site_url}/auth/confirm",
+                    "data": {
+                        "name": name,
+                        "phone": phone
+                    }
+                }
+            })
+            print(f"[SUCCESS] Supabase Auth sign_up 호출 완료 (Custom SMTP 연동): {email}", file=sys.stdout)
+    except Exception as e:
+        print(f"[WARN] Supabase Auth sign_up 오류 또는 기존 계정: {e}", file=sys.stderr)
+
+    # 2. 백엔드 자체 SMTP 발송 (설정되어 있을 경우 백업 발송 및 콘솔 출력)
     send_signup_email(email, name, verify_url)
 
     return jsonify({
@@ -644,15 +662,34 @@ def confirm():
                 url_for("auth.reset_password")
             )
 
-        return redirect("/mypage")
+        # 사용자 메타데이터 추출 및 세션 동기화
+        user_meta = getattr(user, "user_metadata", {}) or {}
+        user_name = user_meta.get("name") or (user.email.split("@")[0] if user.email else "고객")
+        user_phone = user_meta.get("phone", "")
 
-    except Exception:
-        return redirect(
-            url_for(
-                "auth.login",
-                error="invalid_token"
-            )
+        session["name"] = user_name
+        session["phone"] = user_phone
+
+        user_info = {
+            "id": user.email or user.id,
+            "email": user.email or "",
+            "name": user_name,
+            "phone": user_phone,
+        }
+
+        return render_template(
+            "auth/verify_success.html",
+            user=user_info,
+            mall_name="VIBE-FASHION"
         )
+
+    except Exception as e:
+        print(f"[ERROR] 이메일 인증(confirm) 오류: {e}", file=sys.stderr)
+        return render_template(
+            "auth/verify_error.html",
+            error_title="이메일 인증 오류",
+            error_message="유효하지 않거나 이미 만료된 인증 링크입니다. 다시 가입을 시도해주세요."
+        ), 400
 
 
 # =====================================================
