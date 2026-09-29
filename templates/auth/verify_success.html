@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}회원가입 완료 - {{ mall_name }}{% endblock %}
+{% block title %}{% if is_social %}카카오 로그인 완료{% else %}회원가입 완료{% endif %} - {{ mall_name }}{% endblock %}
 
 {% block content %}
 <div class="container py-5 my-5">
@@ -8,11 +8,21 @@
         <div class="col-md-7 col-lg-5">
             <div class="card border-0 shadow-lg rounded-4 overflow-hidden text-center p-4 p-md-5">
                 <div class="mb-4">
+                    {% if is_social %}
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle p-4 mb-3" style="width: 88px; height: 88px; background-color: #FEE500;">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="#000000">
+                            <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.84 1.83 5.342 4.606 6.746l-.973 3.567a.5.5 0 0 0 .736.54l4.24-2.802c.456.046.92.07 1.391.07 5.523 0 10-3.582 10-8s-4.477-8-10-8z"/>
+                        </svg>
+                    </div>
+                    <h2 class="fw-bold mb-2">카카오 로그인 완료!</h2>
+                    <p class="text-secondary small">카카오 계정으로 안전하게 로그인되었습니다.</p>
+                    {% else %}
                     <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success p-4 mb-3" style="width: 88px; height: 88px;">
                         <i class="bi bi-patch-check-fill" style="font-size: 3rem;"></i>
                     </div>
                     <h2 class="fw-bold mb-2">이메일 인증 및 가입 완료!</h2>
                     <p class="text-secondary small">VIBE-FASHION 가족이 되신 것을 진심으로 환영합니다.</p>
+                    {% endif %}
                 </div>
 
                 <div class="bg-light rounded-4 p-3 mb-4 text-start small">
@@ -21,11 +31,11 @@
                         <strong class="text-dark">{{ user.name }} 님</strong>
                     </div>
                     <div class="d-flex justify-content-between py-1 border-bottom">
-                        <span class="text-muted">인증 이메일(ID)</span>
+                        <span class="text-muted">계정 (ID)</span>
                         <span class="text-dark fw-semibold">{{ user.email }}</span>
                     </div>
                     <div class="d-flex justify-content-between py-1">
-                        <span class="text-muted">가입 혜택</span>
+                        <span class="text-muted">회원 혜택</span>
                         <span class="badge bg-danger-subtle text-danger fw-bold">10% 웰컴 쿠폰 지급 완료</span>
                     </div>
                 </div>

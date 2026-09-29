@@ -470,6 +470,18 @@
                                 <button type="submit" id="signupSubmitBtn" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
                                     <i class="bi bi-envelope-check-fill me-1"></i>가입 인증 메일 발송
                                 </button>
+
+                                <!-- 소셜 간편 가입 구분선 및 버튼 -->
+                                <div class="position-relative my-3 text-center">
+                                    <hr class="text-secondary opacity-25">
+                                    <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">또는 간편 시작</span>
+                                </div>
+                                <a href="/auth/kakao" class="btn w-100 py-2 rounded-pill fw-bold d-flex align-items-center justify-content-center text-dark text-decoration-none shadow-sm" style="background-color: #FEE500; border: 1px solid #FEE500;">
+                                    <svg class="me-2" width="18" height="18" viewBox="0 0 24 24" fill="#000000">
+                                        <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.84 1.83 5.342 4.606 6.746l-.973 3.567a.5.5 0 0 0 .736.54l4.24-2.802c.456.046.92.07 1.391.07 5.523 0 10-3.582 10-8s-4.477-8-10-8z"/>
+                                    </svg>
+                                    <span>카카오로 3초 만에 시작하기</span>
+                                </a>
                             </form>
 
                             <!-- 2단계: 메일 발송 완료 안내 화면 -->
@@ -516,10 +528,6 @@
                                         <input type="text" class="form-control" id="loginId" placeholder="이메일 또는 아이디를 입력하세요" required>
                                     </div>
                                 </div>
-                                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                                        <input type="text" class="form-control" id="loginId" placeholder="아이디를 입력하세요" required>
-                                    </div>
-                                </div>
                                 <div class="mb-4">
                                     <label class="form-label small fw-semibold">비밀번호</label>
                                     <div class="input-group">
@@ -530,6 +538,18 @@
                                 <button type="submit" class="btn btn-dark w-100 py-2 rounded-pill fw-bold">
                                     <i class="bi bi-box-arrow-in-right me-1"></i>로그인
                                 </button>
+
+                                <!-- 소셜 간편 로그인 구분선 및 버튼 -->
+                                <div class="position-relative my-3 text-center">
+                                    <hr class="text-secondary opacity-25">
+                                    <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">또는 간편 로그인</span>
+                                </div>
+                                <a href="/auth/kakao" class="btn w-100 py-2 rounded-pill fw-bold d-flex align-items-center justify-content-center text-dark text-decoration-none shadow-sm" style="background-color: #FEE500; border: 1px solid #FEE500;">
+                                    <svg class="me-2" width="18" height="18" viewBox="0 0 24 24" fill="#000000">
+                                        <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.84 1.83 5.342 4.606 6.746l-.973 3.567a.5.5 0 0 0 .736.54l4.24-2.802c.456.046.92.07 1.391.07 5.523 0 10-3.582 10-8s-4.477-8-10-8z"/>
+                                    </svg>
+                                    <span>카카오로 3초 만에 로그인</span>
+                                </a>
                             </form>
                         </div>
                     </div>

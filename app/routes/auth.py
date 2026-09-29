@@ -4,9 +4,9 @@ import os
 import time
 import smtplib
 import sys
+from functools import wraps
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from functools import wraps
 
 from flask import (
     Blueprint,
@@ -19,8 +19,10 @@ from flask import (
     current_app,
 )
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from dotenv import load_dotenv
+from supabase import create_client, Client
 
-from supabase import create_client
+load_dotenv()
 
 auth_bp = Blueprint(
     "auth",
@@ -32,15 +34,17 @@ auth_bp = Blueprint(
 # Supabase
 # =====================================================
 
-SITE_URL = os.getenv(
-    "SITE_URL",
-    "http://localhost:5000"
-)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
-supabase = create_client(
-    os.getenv("SUPABASE_URL", "https://placeholder.supabase.co"),
-    os.getenv("SUPABASE_ANON_KEY", "placeholder-key")
-)
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_ANON_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    except Exception as e:
+        print(f"[WARN] auth.py: Supabase 클라이언트 초기화 실패: {e}", file=sys.stderr)
+else:
+    print("[WARN] auth.py: .env에 SUPABASE_URL 또는 SUPABASE_ANON_KEY가 설정되지 않았습니다.", file=sys.stderr)
 
 # =====================================================
 # 이메일 발송 & 인증 링크 유틸리티
@@ -370,305 +374,57 @@ def verify_signup():
 
 
 # =====================================================
-# 메시지
-# =====================================================
-
-ERROR_MESSAGES = {
-    "login_required": "로그인이 필요합니다.",
-    "email_not_confirmed": "이메일 인증 후 로그인해주세요.",
-    "invalid_credentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
-    "already_registered": "이미 가입된 이메일입니다.",
-    "signup_failed": "회원가입 중 오류가 발생했습니다.",
-    "invalid_token": "유효하지 않은 인증 링크입니다.",
-    "reset_failed": "비밀번호 변경에 실패했습니다.",
-    "password_too_short": "비밀번호는 8자 이상 입력해주세요.",
-}
-
-SUCCESS_MESSAGES = {
-    "password_reset_sent": "비밀번호 재설정 메일을 발송했습니다.",
-    "password_updated": "비밀번호가 성공적으로 변경되었습니다.",
-}
-
-
-def get_error_message():
-    code = request.args.get("error")
-    return ERROR_MESSAGES.get(code)
-
-
-def get_success_message():
-    code = request.args.get("success")
-    return SUCCESS_MESSAGES.get(code)
-
-
-# =====================================================
-# 로그인 필요 데코레이터
+# 로그인 필수 데코레이터
 # =====================================================
 
 def login_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-
         if not session.get("user_id"):
-            return redirect(
-                url_for(
-                    "auth.login",
-                    error="login_required",
-                    next=request.url
-                )
-            )
-
+            return redirect(url_for("main.index"))
         return func(*args, **kwargs)
-
     return wrapper
 
 
 # =====================================================
-# 로그인
-# =====================================================
-
-@auth_bp.route("/login", methods=["GET", "POST"])
-def login():
-
-    if session.get("user_id"):
-        return redirect("/mypage")
-
-    if request.method == "POST":
-
-        email = request.form.get(
-            "email",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-        next_url = request.args.get("next")
-
-        try:
-
-            result = supabase.auth.sign_in_with_password(
-                {
-                    "email": email,
-                    "password": password,
-                }
-            )
-
-            user = result.user
-
-            if not user:
-                return redirect(
-                    url_for(
-                        "auth.login",
-                        error="invalid_credentials"
-                    )
-                )
-
-            if not getattr(
-                user,
-                "email_confirmed_at",
-                None
-            ):
-                return redirect(
-                    url_for(
-                        "auth.login",
-                        error="email_not_confirmed"
-                    )
-                )
-
-            session["user_id"] = user.id
-            session["email"] = user.email
-
-            if result.session:
-                session["access_token"] = (
-                    result.session.access_token
-                )
-
-                session["refresh_token"] = (
-                    result.session.refresh_token
-                )
-
-            if next_url:
-                return redirect(next_url)
-
-            return redirect("/mypage")
-
-        except Exception:
-            return redirect(
-                url_for(
-                    "auth.login",
-                    error="invalid_credentials"
-                )
-            )
-
-    return render_template(
-        "auth/login.html",
-        error=get_error_message(),
-        success=get_success_message(),
-    )
-
-
-# =====================================================
-# 회원가입
-# =====================================================
-
-@auth_bp.route("/signup", methods=["GET", "POST"])
-def signup():
-
-    if session.get("user_id"):
-        return redirect("/mypage")
-
-    if request.method == "POST":
-
-        name = request.form.get(
-            "name",
-            ""
-        ).strip()
-
-        email = request.form.get(
-            "email",
-            ""
-        ).strip()
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-        if len(password) < 8:
-            return redirect(
-                url_for(
-                    "auth.signup",
-                    error="password_too_short"
-                )
-            )
-
-        try:
-
-            supabase.auth.sign_up(
-                {
-                    "email": email,
-                    "password": password,
-                    "options": {
-                        "email_redirect_to": (
-                            f"{SITE_URL}/auth/confirm"
-                        ),
-                        "data": {
-                            "name": name
-                        }
-                    }
-                }
-            )
-
-            return redirect(
-                url_for(
-                    "auth.signup_complete"
-                )
-            )
-
-        except Exception as e:
-
-            if "already" in str(e).lower():
-                return redirect(
-                    url_for(
-                        "auth.signup",
-                        error="already_registered"
-                    )
-                )
-
-            return redirect(
-                url_for(
-                    "auth.signup",
-                    error="signup_failed"
-                )
-            )
-
-    return render_template(
-        "auth/signup.html",
-        error=get_error_message(),
-    )
-
-
-# =====================================================
-# 회원가입 완료
-# =====================================================
-
-@auth_bp.route("/signup-complete")
-def signup_complete():
-
-    return render_template(
-        "auth/signup_complete.html",
-        message="인증 메일을 보냈습니다. 이메일을 확인해주세요."
-    )
-
-
-# =====================================================
-# 이메일 인증
+# 3. Supabase 기본 인증 메일 리다이렉트 처리 (/auth/confirm)
 # =====================================================
 
 @auth_bp.route("/confirm")
 def confirm():
+    """
+    Supabase가 발송한 확인 메일의 링크를 클릭했을 때 처리합니다.
+    """
+    token_hash = request.args.get("token_hash")
+    verify_type = request.args.get("type", "signup")
 
-    token_hash = request.args.get(
-        "token_hash"
-    )
-
-    verify_type = request.args.get(
-        "type",
-        "signup"
-    )
-
-    if not token_hash:
-        return redirect(
-            url_for(
-                "auth.login",
-                error="invalid_token"
-            )
-        )
+    if not token_hash or not supabase:
+        return render_template(
+            "auth/verify_error.html",
+            error_title="인증 링크 오류",
+            error_message="유효한 인증 토큰을 찾을 수 없습니다."
+        ), 400
 
     try:
-
-        result = supabase.auth.verify_otp(
-            {
-                "token_hash": token_hash,
-                "type": verify_type,
-            }
-        )
-
+        result = supabase.auth.verify_otp({
+            "token_hash": token_hash,
+            "type": verify_type,
+        })
         user = result.user
-
         if not user:
-            return redirect(
-                url_for(
-                    "auth.login",
-                    error="invalid_token"
-                )
-            )
+            raise ValueError("사용자 인증 실패")
 
-        session["user_id"] = user.id
-        session["email"] = user.email
-
-        if result.session:
-            session["access_token"] = (
-                result.session.access_token
-            )
-            session["refresh_token"] = (
-                result.session.refresh_token
-            )
-
-        if verify_type == "recovery":
-            return redirect(
-                url_for("auth.reset_password")
-            )
-
-        # 사용자 메타데이터 추출 및 세션 동기화
         user_meta = getattr(user, "user_metadata", {}) or {}
         user_name = user_meta.get("name") or (user.email.split("@")[0] if user.email else "고객")
         user_phone = user_meta.get("phone", "")
 
+        session["user_id"] = user.id
+        session["email"] = user.email
         session["name"] = user_name
         session["phone"] = user_phone
+
+        if result.session:
+            session["access_token"] = result.session.access_token
 
         user_info = {
             "id": user.email or user.id,
@@ -680,146 +436,149 @@ def confirm():
         return render_template(
             "auth/verify_success.html",
             user=user_info,
-            mall_name="VIBE-FASHION"
+            mall_name="VIBE-FASHION",
+            is_social=False
         )
 
     except Exception as e:
-        print(f"[ERROR] 이메일 인증(confirm) 오류: {e}", file=sys.stderr)
+        print(f"[ERROR] Supabase 이메일 confirm 오류: {e}", file=sys.stderr)
         return render_template(
             "auth/verify_error.html",
             error_title="이메일 인증 오류",
-            error_message="유효하지 않거나 이미 만료된 인증 링크입니다. 다시 가입을 시도해주세요."
+            error_message="유효하지 않거나 이미 만료된 인증 링크입니다."
         ), 400
 
 
 # =====================================================
-# 로그아웃
+# 4. 카카오톡 소셜 로그인 시작 (/auth/kakao)
+# =====================================================
+
+@auth_bp.route("/kakao")
+def kakao_login():
+    """
+    카카오톡 OAuth 소셜 로그인 인증 페이지로 리다이렉트합니다.
+    """
+    site_url = os.getenv("SITE_URL")
+    if not site_url:
+        site_url = request.host_url.rstrip("/")
+
+    callback_url = f"{site_url}/auth/callback"
+
+    try:
+        if not supabase:
+            return render_template(
+                "auth/verify_error.html",
+                error_title="카카오 로그인 오류",
+                error_message="Supabase 연동이 설정되지 않았습니다."
+            ), 500
+
+        res = supabase.auth.sign_in_with_oauth({
+            "provider": "kakao",
+            "options": {
+                "redirect_to": callback_url
+            }
+        })
+
+        auth_url = getattr(res, "url", None)
+        if auth_url:
+            return redirect(auth_url)
+        else:
+            raise ValueError("카카오 인증 URL을 생성할 수 없습니다.")
+    except Exception as e:
+        print(f"[ERROR] 카카오 로그인 시작 실패: {e}", file=sys.stderr)
+        return render_template(
+            "auth/verify_error.html",
+            error_title="카카오 로그인 연결 실패",
+            error_message=f"카카오 로그인 서버로 연결하는 중 오류가 발생했습니다: {str(e)}"
+        ), 400
+
+
+# =====================================================
+# 5. 소셜 로그인(카카오 등) 콜백 (/auth/callback)
+# =====================================================
+
+@auth_bp.route("/callback")
+def auth_callback():
+    """
+    소셜 로그인(카카오톡) 인증 후 돌아오는 콜백 라우트입니다.
+    """
+    code = request.args.get("code")
+    error = request.args.get("error_description") or request.args.get("error")
+
+    if error:
+        return render_template(
+            "auth/verify_error.html",
+            error_title="카카오 로그인 실패",
+            error_message=f"카카오 인증 과정에서 오류가 발생했습니다: {error}"
+        ), 400
+
+    # 1. 서버 측 PKCE code 파라미터가 있는 경우
+    if code and supabase:
+        try:
+            res = supabase.auth.exchange_code_for_session({"auth_code": code})
+            user = res.user
+            session_data = res.session
+
+            if not user:
+                raise ValueError("사용자 정보를 찾을 수 없습니다.")
+
+            user_meta = getattr(user, "user_metadata", {}) or {}
+            user_name = (
+                user_meta.get("name")
+                or user_meta.get("full_name")
+                or user_meta.get("nickname")
+                or (user.email.split("@")[0] if user.email else "카카오회원")
+            )
+            user_phone = user_meta.get("phone", "")
+            user_email = user.email or f"kakao_{user.id[:8]}@vibe-fashion.com"
+
+            session["user_id"] = user.id
+            session["email"] = user_email
+            session["name"] = user_name
+            session["phone"] = user_phone
+            if session_data:
+                session["access_token"] = session_data.access_token
+
+            user_info = {
+                "id": user_email,
+                "email": user_email,
+                "name": user_name,
+                "phone": user_phone
+            }
+
+            return render_template(
+                "auth/verify_success.html",
+                user=user_info,
+                mall_name="VIBE-FASHION",
+                is_social=True
+            )
+        except Exception as e:
+            print(f"[ERROR] 카카오 OAuth 콜백 처리 오류: {e}", file=sys.stderr)
+            return render_template(
+                "auth/verify_error.html",
+                error_title="카카오 로그인 처리 실패",
+                error_message=f"사용자 세션을 생성하는 중 오류가 발생했습니다: {str(e)}"
+            ), 400
+
+    # 2. 클라이언트 측 해시(#access_token) 처리용 폴백
+    return render_template(
+        "auth/callback.html",
+        mall_name="VIBE-FASHION"
+    )
+
+
+# =====================================================
+# 6. 로그아웃
 # =====================================================
 
 @auth_bp.route("/logout")
 def logout():
-
     try:
-        supabase.auth.sign_out()
+        if supabase:
+            supabase.auth.sign_out()
     except Exception:
         pass
 
     session.clear()
-
     return redirect("/")
 
-
-# =====================================================
-# 비밀번호 재설정 이메일 요청
-# =====================================================
-
-@auth_bp.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
-
-    if request.method == "POST":
-
-        email = request.form.get(
-            "email",
-            ""
-        ).strip()
-
-        try:
-
-            supabase.auth.reset_password_for_email(
-                email,
-                {
-                    "redirect_to": (
-                        f"{SITE_URL}/auth/confirm?type=recovery"
-                    )
-                }
-            )
-
-            return redirect(
-                url_for(
-                    "auth.login",
-                    success="password_reset_sent"
-                )
-            )
-
-        except Exception:
-            return redirect(
-                url_for(
-                    "auth.login",
-                    success="password_reset_sent"
-                )
-            )
-
-    return render_template(
-        "auth/forgot_password.html",
-        error=get_error_message(),
-        success=get_success_message(),
-    )
-
-
-# =====================================================
-# 비밀번호 변경
-# =====================================================
-
-@auth_bp.route("/reset-password", methods=["GET", "POST"])
-def reset_password():
-
-    if not session.get("user_id"):
-        return redirect(
-            url_for(
-                "auth.login",
-                error="invalid_token"
-            )
-        )
-
-    if request.method == "POST":
-
-        password = request.form.get(
-            "password",
-            ""
-        )
-
-        if len(password) < 8:
-            return redirect(
-                url_for(
-                    "auth.reset_password",
-                    error="password_too_short"
-                )
-            )
-
-        try:
-
-            access_token = session.get("access_token")
-            refresh_token = session.get("refresh_token")
-
-            if access_token and refresh_token:
-                supabase.auth.set_session(
-                    access_token,
-                    refresh_token
-                )
-
-            supabase.auth.update_user(
-                {
-                    "password": password
-                }
-            )
-
-            return redirect(
-                url_for(
-                    "auth.login",
-                    success="password_updated"
-                )
-            )
-
-        except Exception:
-            return redirect(
-                url_for(
-                    "auth.reset_password",
-                    error="reset_failed"
-                )
-            )
-
-    return render_template(
-        "auth/reset_password.html",
-        error=get_error_message(),
-        success=get_success_message(),
-    )

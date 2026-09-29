@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}카카오 로그인 처리 중 - {{ mall_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden text-center p-4 p-md-5">
+                <div class="mb-3">
+                    <div class="spinner-border text-warning" style="width: 3.5rem; height: 3.5rem;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-2">카카오 로그인 처리 중</h4>
+                <p class="text-secondary small mb-3">잠시만 기다려주세요. 계정 정보를 확인하고 있습니다...</p>
+                <div id="callbackStatus" class="small text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function handleOAuthHash() {
+    const hash = window.location.hash;
+
+    if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+
+        if (accessToken) {
+            try {
+                // JWT payload 디코딩
+                const base64Url = accessToken.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const decoded = JSON.parse(jsonPayload);
+
+                const userMeta = decoded.user_metadata || {};
+                const email = decoded.email || ('kakao_' + (decoded.sub || 'user').slice(0, 8) + '@vibe-fashion.com');
+                const name = userMeta.name || userMeta.full_name || userMeta.nickname || email.split('@')[0];
+
+                // 로컬 스토리지에 사용자 정보 저장
+                const userObj = {
+                    id: email,
+                    email: email,
+                    name: name,
+                    phone: userMeta.phone || '',
+                    createdAt: new Date().toISOString()
+                };
+
+                let users = [];
+                try {
+                    const stored = localStorage.getItem('vibe_users');
+                    if (stored) users = JSON.parse(stored);
+                } catch(e) { users = []; }
+
+                const idx = users.findIndex(u => u.email === email || u.id === email);
+                if (idx >= 0) {
+                    users[idx] = { ...users[idx], ...userObj };
+                } else {
+                    users.push(userObj);
+                }
+                localStorage.setItem('vibe_users', JSON.stringify(users));
+                localStorage.setItem('vibe_current_user', JSON.stringify(userObj));
+
+                window.location.href = '/';
+                return;
+            } catch (err) {
+                console.error('토큰 파싱 실패:', err);
+            }
+        }
+    }
+
+    // hash가 없는 일반적인 경우 1.5초 후 홈으로 이동
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 1500);
+})();
+</script>
+{% endblock %}
