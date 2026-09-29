@@ -51,12 +51,71 @@ def get_serializer():
     return URLSafeTimedSerializer(secret_key)
 
 
+def get_smtp_accounts():
+    """
+    SMTP 계정 목록을 파싱합니다.
+    단일 계정(SMTP_USER / SMTP_PASSWORD) 또는
+    쉼표(,) 및 세미콜론(;)으로 구분된 멀티 계정(GMAIL_ACCOUNTS / SMTP_USERS / SMTP_PASSWORDS)을 지원하여
+    여러 Gmail 계정을 라운드로빈 방식으로 자동 분산 발송(한도 계정 수 × 500통 확장)합니다.
+    """
+    accounts = []
+
+    # 1. GMAIL_ACCOUNTS 포맷 지원 (예: "user1@gmail.com:pass1,user2@gmail.com:pass2")
+    multi_raw = os.getenv("GMAIL_ACCOUNTS", "").strip()
+    if multi_raw:
+        for entry in multi_raw.split(","):
+            entry = entry.strip()
+            if ":" in entry:
+                u, p = entry.split(":", 1)
+                accounts.append({
+                    "user": u.strip(),
+                    "password": p.strip(),
+                    "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                    "port": int(os.getenv("SMTP_PORT", "587")),
+                    "from": u.strip()
+                })
+
+    # 2. SMTP_USERS 및 SMTP_PASSWORDS 리스트 포맷 지원
+    users_raw = os.getenv("SMTP_USERS", "").strip()
+    passwords_raw = os.getenv("SMTP_PASSWORDS", "").strip()
+    if users_raw and passwords_raw:
+        users = [u.strip() for u in users_raw.split(",") if u.strip()]
+        passwords = [p.strip() for p in passwords_raw.split(",") if p.strip()]
+        for u, p in zip(users, passwords):
+            accounts.append({
+                "user": u,
+                "password": p,
+                "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                "port": int(os.getenv("SMTP_PORT", "587")),
+                "from": u
+            })
+
+    # 3. 기본 단일 계정 지원
+    single_user = os.getenv("SMTP_USER", "").strip()
+    single_pass = os.getenv("SMTP_PASSWORD", "").strip()
+    if single_user and single_pass:
+        # 중복 추가 방지
+        if not any(acc["user"] == single_user for acc in accounts):
+            accounts.append({
+                "user": single_user,
+                "password": single_pass,
+                "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                "port": int(os.getenv("SMTP_PORT", "587")),
+                "from": os.getenv("SMTP_FROM", single_user)
+            })
+
+    return accounts
+
+
+_account_index = 0
+
 def send_signup_email(to_email, user_name, verify_url):
     """
     회원가입 인증 링크가 담긴 이메일을 발송합니다.
-    SMTP 환경변수가 설정되어 있으면 실제 이메일을 발송하고,
-    개발/로컬 환경에서는 콘솔 터미널에 가입 링크를 출력합니다.
+    등록된 Gmail 계정들을 라운드로빈 및 장애 복구(Failover) 방식으로 순환 발송하여
+    Gmail 1개당 500통 한도를 N개(N x 500통)로 자동 확장합니다.
     """
+    global _account_index
     subject = f"[VIBE-FASHION] {user_name}님, 회원가입 인증 링크입니다."
     
     html_content = f"""
@@ -118,14 +177,23 @@ def send_signup_email(to_email, user_name, verify_url):
     print(f" 가입 완료 링크: {verify_url}", file=sys.stdout)
     print("=" * 70 + "\n", file=sys.stdout)
 
-    # 실제 SMTP 발송 시도
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    smtp_from = os.getenv("SMTP_FROM", smtp_user or "noreply@vibe-fashion.com")
+    accounts = get_smtp_accounts()
+    if not accounts:
+        return True
 
-    if smtp_host and smtp_user and smtp_password:
+    # 등록된 Gmail 계정 목록 순환 (Round-Robin) 및 장애 시 자동 전환 (Failover)
+    total_accounts = len(accounts)
+    start_index = _account_index % total_accounts
+
+    for attempt in range(total_accounts):
+        current_idx = (start_index + attempt) % total_accounts
+        acc = accounts[current_idx]
+        smtp_user = acc["user"]
+        smtp_password = acc["password"]
+        smtp_host = acc.get("host", "smtp.gmail.com")
+        smtp_port = acc.get("port", 587)
+        smtp_from = acc.get("from", smtp_user)
+
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
@@ -141,12 +209,15 @@ def send_signup_email(to_email, user_name, verify_url):
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_from, [to_email], msg.as_string())
             server.quit()
-            print(f"[SUCCESS] 실제 이메일 발송 성공: {to_email}", file=sys.stdout)
+            
+            # 발송 성공 시 다음 계정으로 인덱스 이동 (계정 간 균등 분산으로 한도 극대화)
+            _account_index = (current_idx + 1) % total_accounts
+            print(f"[SUCCESS] 이메일 발송 성공 (사용 계정: {smtp_user}): {to_email}", file=sys.stdout)
             return True
         except Exception as e:
-            print(f"[WARN] SMTP 실제 발송 실패 (콘솔 링크 사용): {e}", file=sys.stderr)
-            return False
-    return True
+            print(f"[WARN] Gmail 계정 ({smtp_user}) 발송 실패/한도초과, 다음 계정 시도: {e}", file=sys.stderr)
+
+    return False
 
 
 # =====================================================
