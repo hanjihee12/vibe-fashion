@@ -534,14 +534,16 @@ def api_product_options(product_id):
         }), 400
 
     options = []
-    if supabase and is_valid_uuid(product_id):
+    db = supabase_admin or supabase
+    
+    if db and is_valid_uuid(product_id):
         try:
             res = (
-                supabase.table('product_options')
+                db.table('product_options')
                 .select('id, size, stock, additional_price')
                 .eq('product_id', product_id)
                 .eq('color', color)
-                .not_.is_('size', 'null')
+                .order('size')
                 .execute()
             )
             raw_data = res.data or []
@@ -557,8 +559,8 @@ def api_product_options(product_id):
                 stock_val = int(opt.get('stock', 0) or 0)
                 add_price = int(opt.get('additional_price', 0) or 0)
                 options.append({
-                    'id': str(opt.get('id')),
-                    'size': opt.get('size'),
+                    'id': str(opt.get('id', '')),
+                    'size': opt.get('size', ''),
                     'stock': stock_val,
                     'is_soldout': (stock_val <= 0),
                     'additional_price': add_price,
@@ -566,19 +568,7 @@ def api_product_options(product_id):
                 })
         except Exception as e:
             print(f"[ERROR] 옵션 조회 API 오류 ({product_id}, {color}): {e}", file=sys.stderr)
-            return jsonify({'status': 'error', 'message': str(e), 'options': []}), 500
-
-    if not options:
-        # 더미 데이터 fallback
-        for s, stk, add_p in [('S', 0, 0), ('M', 25, 0), ('L', 10, 2000)]:
-            options.append({
-                'id': f"dummy-{color}-{s}",
-                'size': s,
-                'stock': stk,
-                'is_soldout': (stk <= 0),
-                'additional_price': add_p,
-                'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
-            })
+            return jsonify({'status': 'error', 'message': f"데이터 조회 실패: {str(e)}", 'options': []}), 500
 
     return jsonify({
         'status': 'success',
