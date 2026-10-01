@@ -274,8 +274,16 @@ async function handleColorChange() {
         }
         const data = await response.json();
         const options = data.options || [];
+        
+        console.log('[DEBUG] API 응답:', {
+            색상: selectedColor,
+            옵션개수: options.length,
+            옵션데이터: options,
+            전체응답: data
+        });
 
         if (options.length === 0) {
+            console.warn('[WARNING] 색상에 해당하는 사이즈 옵션이 없습니다:', selectedColor);
             sizeSelect.innerHTML = '<option value="">선택 가능한 사이즈가 없습니다.</option>';
             sizeSelect.disabled = true;
             return;
