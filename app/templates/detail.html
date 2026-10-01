@@ -441,7 +441,7 @@ function updateSummary() {
 /**
  * 5. 장바구니 담기 실행
  */
-function submitAddToCart() {
+async function submitAddToCart() {
     if (!selectedColor) {
         alert('색상을 먼저 선택해주세요.');
         document.getElementById('colorSelect').focus();
@@ -460,37 +460,80 @@ function submitAddToCart() {
     const itemFullName = `${CURRENT_PRODUCT_NAME} (${selectedColor} / ${selectedSize})`;
     const finalPrice = BASE_PRICE + additionalPrice;
 
-    // main.js의 cartItems 배열에 추가
-    if (typeof cartItems !== 'undefined') {
-        const existingIndex = cartItems.findIndex(item => item.name === itemFullName);
-        if (existingIndex > -1) {
-            cartItems[existingIndex].quantity += currentQuantity;
-        } else {
-            cartItems.push({
-                name: itemFullName,
-                price: finalPrice,
-                priceStr: finalPrice.toLocaleString() + '원',
-                quantity: currentQuantity,
-                image: CURRENT_PRODUCT_IMAGE,
-                color: selectedColor,
-                size: selectedSize,
-                optionId: selectedOptionId
-            });
-        }
-        if (typeof saveCart === 'function') {
-            saveCart();
-        }
+    const btn = document.getElementById('addToCartBtn');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>담는 중...';
     }
 
-    // 토스트 팝업 띄우기
-    const toastMessage = document.getElementById('toastMessage');
-    if (toastMessage) {
-        toastMessage.innerHTML = `🛒 <strong>${itemFullName}</strong>이(가) 장바구니에 담겼습니다! <br><span class="text-warning small">${finalPrice.toLocaleString()}원 × ${currentQuantity}개</span>`;
-    }
-    const toastElement = document.getElementById('cartToast');
-    if (toastElement && window.bootstrap) {
-        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
-        toastInstance.show();
+    try {
+        const response = await fetch('/cart/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                product_option_id: selectedOptionId,
+                quantity: currentQuantity
+            })
+        });
+
+        // 비로그인 시 /auth/login 으로 리다이렉트
+        if (response.redirected && response.url.includes('/auth/login')) {
+            alert('로그인이 필요한 서비스입니다. 로그인 페이지로 이동합니다.');
+            window.location.href = response.url;
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data.success) {
+            alert(data.message || '장바구니 담기에 실패했습니다.');
+            return;
+        }
+
+        // main.js의 cartItems 배열에도 로컬 동기화
+        if (typeof cartItems !== 'undefined') {
+            const existingIndex = cartItems.findIndex(item => item.name === itemFullName);
+            if (existingIndex > -1) {
+                cartItems[existingIndex].quantity += currentQuantity;
+            } else {
+                cartItems.push({
+                    name: itemFullName,
+                    price: finalPrice,
+                    priceStr: finalPrice.toLocaleString() + '원',
+                    quantity: currentQuantity,
+                    image: CURRENT_PRODUCT_IMAGE,
+                    color: selectedColor,
+                    size: selectedSize,
+                    optionId: selectedOptionId
+                });
+            }
+            if (typeof saveCart === 'function') {
+                saveCart();
+            }
+        }
+
+        // 토스트 팝업 띄우기
+        const toastMessage = document.getElementById('toastMessage');
+        if (toastMessage) {
+            toastMessage.innerHTML = `🛒 <strong>${itemFullName}</strong>이(가) 장바구니에 담겼습니다! <br><span class="text-warning small">${finalPrice.toLocaleString()}원 × ${currentQuantity}개</span>`;
+        }
+        const toastElement = document.getElementById('cartToast');
+        if (toastElement && window.bootstrap) {
+            const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+            toastInstance.show();
+        }
+    } catch (err) {
+        console.error('장바구니 추가 오류:', err);
+        alert('장바구니 추가 중 통신 오류가 발생했습니다.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     }
 }
 
