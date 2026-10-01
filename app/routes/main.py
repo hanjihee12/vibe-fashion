@@ -706,7 +706,27 @@ def add_to_cart():
         if not user_uuid:
             return jsonify({"success": False, "message": "사용자 프로필 정보를 확인할 수 없습니다."}), 400
 
-        # 5. carts 테이블 기존 수량 확인 (upsert)
+        # 5. 기본 옵션인 경우 먼저 product_options에 upsert (외래키 제약 해결)
+        if is_default_option:
+            try:
+                # default 옵션 파싱: default-{product_id}-{color}-{size}
+                parts = product_option_id.split('-', 4)  # default, product_id, color, size
+                color_name = parts[2] if len(parts) > 2 else 'default'
+                size_name = parts[3] if len(parts) > 3 else 'M'
+                
+                # 기본 옵션을 product_options에 upsert
+                db.table('product_options').upsert({
+                    'id': product_option_id,
+                    'product_id': product_id_db,
+                    'color': color_name,
+                    'size': size_name,
+                    'stock': 999,
+                    'additional_price': 0
+                }).execute()
+            except Exception as e:
+                print(f"[WARNING] 기본 옵션 upsert 실패: {e}")
+
+        # 6. carts 테이블 기존 수량 확인 (upsert)
         cart_query = db.table('carts').select('*').eq('user_id', user_uuid).eq('option_id', product_option_id).execute()
         existing_cart = cart_query.data[0] if cart_query.data else None
 
