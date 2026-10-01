@@ -489,11 +489,13 @@ def kakao_login():
 
     try:
         # 카카오 공식 인가 코드 발급 URL (account_email 요청 배제 -> KOE205 완벽 방지)
+        # prompt=select_account: 로그아웃 후 재로그인 시 계정 선택 화면을 명확하게 노출
         params = {
             "client_id": KAKAO_CLIENT_ID,
             "redirect_uri": callback_url,
             "response_type": "code",
-            "scope": "profile_nickname,profile_image"
+            "scope": "profile_nickname,profile_image",
+            "prompt": "select_account"
         }
         kakao_auth_url = f"https://kauth.kakao.com/oauth/authorize?{urllib.parse.urlencode(params)}"
         return redirect(kakao_auth_url)
@@ -515,12 +517,12 @@ def auth_callback():
     """
     소셜 로그인(카카오톡) 인증 후 돌아오는 콜백 라우트입니다.
     """
-    # 이미 로그인된 세션이 있는 경우 홈으로 이동
-    if session.get("user_id"):
-        return redirect("/")
-
     code = request.args.get("code")
     error = request.args.get("error_description") or request.args.get("error")
+
+    # code가 없는 일반적인 접근 시 이미 세션이 있으면 홈으로 이동
+    if not code and session.get("user_id"):
+        return redirect("/")
 
     if error:
         return render_template(

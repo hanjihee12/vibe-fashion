@@ -758,6 +758,9 @@ function handleLogout() {
         localStorage.removeItem('vibe_current_user');
     } catch (e) {}
 
+    // 서버 측 세션 정리 동기화
+    fetch('/auth/logout').catch(function() {});
+
     updateUserAuthUI();
 
     const toastMessage = document.getElementById('toastMessage');
