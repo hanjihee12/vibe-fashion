@@ -489,7 +489,8 @@ def kakao_login():
         res = supabase.auth.sign_in_with_oauth({
             "provider": "kakao",
             "options": {
-                "redirect_to": callback_url
+                "redirect_to": callback_url,
+                "scopes": "profile_nickname,profile_image"
             }
         })
 
