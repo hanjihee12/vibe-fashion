@@ -835,6 +835,66 @@ def update_cart_quantity(cart_id):
     })
 
 
+@main_bp.route('/cart/<cart_id>', methods=['DELETE'])
+def delete_cart_item(cart_id):
+    """
+    장바구니 아이템 삭제 라우트 (DELETE /cart/<cart_id>)
+    - 로그인 여부 확인
+    - 본인 소유의 장바구니 아이템인지 확인
+    - 성공 시 아이템 삭제 후 {"success": true} 반환
+    """
+    # 1. 로그인 여부 확인
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+    if not user_id:
+        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
+
+    # 2. cart_id 유효성 확인
+    if not is_valid_uuid(cart_id):
+        return jsonify({"success": False, "message": "유효하지 않은 장바구니 ID입니다."}), 400
+
+    db = supabase_admin or supabase
+    if not db:
+        return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
+
+    # 3. cart_id로 장바구니 아이템 조회
+    cart_res = db.table('carts').select('*').eq('id', cart_id).execute()
+    if not cart_res.data:
+        return jsonify({"success": False, "message": "해당 장바구니 항목을 찾을 수 없습니다."}), 404
+
+    cart_item = cart_res.data[0]
+    cart_user_id = cart_item.get('user_id')
+
+    # 4. 권한 확인 (본인 소유의 장바구니 아이템인지 확인)
+    user_uuid = None
+    if is_valid_uuid(user_id):
+        user_uuid = str(user_id)
+    elif user_email:
+        prof_res = db.table('profiles').select('id').eq('email', user_email).execute()
+        if prof_res.data:
+            user_uuid = str(prof_res.data[0]['id'])
+
+    if not user_uuid:
+        prof_any = db.table('profiles').select('id').limit(1).execute()
+        if prof_any.data:
+            user_uuid = str(prof_any.data[0]['id'])
+
+    if str(cart_user_id) != str(user_uuid):
+        return jsonify({"success": False, "message": "다른 사용자의 장바구니에 접근할 수 없습니다."}), 403
+
+    # 5. 장바구니 아이템 삭제
+    try:
+        db.table('carts').delete().eq('id', cart_id).execute()
+    except Exception as e:
+        print(f"[ERROR] 장바구니 삭제 오류: {e}", file=sys.stderr)
+        return jsonify({"success": False, "message": "장바구니 삭제 중 오류가 발생했습니다."}), 500
+
+    return jsonify({
+        "success": True,
+        "message": "장바구니에서 제거되었습니다."
+    })
+
+
 @main_bp.route('/mypage', methods=['GET', 'POST'])
 @login_required
 def mypage():

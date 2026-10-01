@@ -97,6 +97,25 @@
     </div>
 </div>
 
+<!-- 삭제 확인 모달 -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title" id="deleteConfirmLabel">삭제 확인</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmMessage">이 상품을 장바구니에서 삭제하시겠습니까?</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-danger" id="deleteConfirmBtn" onclick="confirmDelete()">삭제</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 수량 변경 토스트 -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="updateToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
@@ -156,8 +175,18 @@
         item_count: 0
     };
 
+    // 삭제 모달 관련
+    let deleteModalInstance = null;
+    let pendingDeleteCartId = null;
+
     // 페이지 로드 시 장바구니 데이터 조회
     document.addEventListener('DOMContentLoaded', function() {
+        // 모달 인스턴스 생성
+        const deleteModalElement = document.getElementById('deleteConfirmModal');
+        if (deleteModalElement) {
+            deleteModalInstance = new bootstrap.Modal(deleteModalElement);
+        }
+
         loadCartItems();
     });
 
@@ -257,13 +286,84 @@
                 <span class="price-text" id="subtotal-${item.id}">${formatPrice(subtotal)}</span>
             </td>
             <td>
-                <button class="btn btn-sm btn-outline-danger" onclick="removeCartItem('${item.id}')">
+                <button class="btn btn-sm btn-outline-danger" onclick="showDeleteConfirm('${item.id}', '${escapeHtml(item.product_name)}')">
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
         `;
 
         return tr;
+    }
+
+    function showDeleteConfirm(cartId, productName) {
+        pendingDeleteCartId = cartId;
+        const message = document.getElementById('deleteConfirmMessage');
+        message.textContent = `"${productName}"을(를) 장바구니에서 삭제하시겠습니까?`;
+        
+        if (deleteModalInstance) {
+            deleteModalInstance.show();
+        }
+    }
+
+    function confirmDelete() {
+        if (!pendingDeleteCartId) {
+            return;
+        }
+
+        const cartId = pendingDeleteCartId;
+        pendingDeleteCartId = null;
+
+        // 모달 닫기
+        if (deleteModalInstance) {
+            deleteModalInstance.hide();
+        }
+
+        removeCartItem(cartId);
+    }
+
+    function removeCartItem(cartId) {
+        const cartRow = document.getElementById(`cart-item-${cartId}`);
+        if (!cartRow) {
+            return;
+        }
+
+        // UI 업데이트 (삭제 중 표시)
+        cartRow.classList.add('updating');
+
+        // DELETE 요청
+        fetch(`${CART_UPDATE_URL}/${cartId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('오류: ' + (data.message || '삭제 실패'));
+                    cartRow.classList.remove('updating');
+                    return;
+                }
+
+                // 성공: 로컬 데이터 업데이트
+                const cartItem = cartData.items.find(item => item.id === cartId);
+                if (cartItem) {
+                    cartData.items = cartData.items.filter(item => item.id !== cartId);
+                    cartRow.remove();
+                    updateSummary();
+                    showUpdateToast(`${cartItem.product_name}이(가) 제거되었습니다.`);
+
+                    // 장바구니가 비었는지 확인
+                    if (cartData.items.length === 0) {
+                        document.getElementById('emptyCartMsg').style.display = 'block';
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error deleting cart item:', err);
+                alert('삭제 중 오류가 발생했습니다.');
+                cartRow.classList.remove('updating');
+            });
     }
 
     function changeQuantity(cartId, newQuantity, triggerElement) {
@@ -333,30 +433,6 @@
                 cartRow.classList.remove('updating');
                 triggerElement.disabled = false;
             });
-    }
-
-    function removeCartItem(cartId) {
-        if (!confirm('이 항목을 장바구니에서 제거하시겠습니까?')) {
-            return;
-        }
-
-        // quantity를 0으로 설정하여 삭제 (또는 DELETE 엔드포인트 필요)
-        // 현재는 간단히 로컬에서 제거
-        const cartRow = document.getElementById(`cart-item-${cartId}`);
-        cartRow.style.opacity = '0.5';
-
-        // 로컬 데이터에서 제거
-        cartData.items = cartData.items.filter(item => item.id !== cartId);
-        cartRow.remove();
-
-        updateSummary();
-
-        if (cartData.items.length === 0) {
-            document.getElementById('emptyCartMsg').style.display = 'block';
-            document.querySelector('.table-responsive').style.display = 'none';
-        }
-
-        showUpdateToast('항목이 제거되었습니다.');
     }
 
     function updateSummary() {
