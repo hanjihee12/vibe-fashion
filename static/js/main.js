@@ -700,54 +700,105 @@ async function handleSignup(event) {
 /**
  * 로그인 제출 처리
  */
-function handleLogin(event) {
+async function handleLogin(event) {
     event.preventDefault();
 
-    const id = document.getElementById('loginId').value.trim().toLowerCase();
-    const pw = document.getElementById('loginPassword').value;
+    const idInput = event.target.querySelector('#loginId') || document.getElementById('loginId');
+    const pwInput = event.target.querySelector('#loginPassword') || document.getElementById('loginPassword');
 
-    const users = getUsersList();
-    const matched = users.find(u => {
-        const uId = (u.id || '').toLowerCase();
-        const uEmail = (u.email || '').toLowerCase();
-        return (uId === id || uEmail === id) && u.pw === pw;
-    });
+    const id = (idInput ? idInput.value : '').trim().toLowerCase();
+    const pw = pwInput ? pwInput.value : '';
 
-    if (!matched) {
-        alert('이메일(아이디) 또는 비밀번호가 일치하지 않습니다.');
+    if (!id || !pw) {
+        alert('이메일(아이디)과 비밀번호를 모두 입력해주세요.');
         return;
     }
 
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.innerHTML : '로그인';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>로그인 중...';
+    }
+
     try {
-        localStorage.setItem('vibe_current_user', JSON.stringify({
-            id: matched.id || matched.email,
-            email: matched.email || matched.id,
-            name: matched.name,
-            phone: matched.phone
-        }));
-    } catch (e) {
-        console.error(e);
-    }
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ email: id, password: pw })
+        });
 
-    updateUserAuthUI();
+        const result = await response.json().catch(() => ({}));
 
-    // 모달 닫기 및 폼 리셋
-    const modalEl = document.getElementById('authModal');
-    if (modalEl && window.bootstrap) {
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-    }
-    document.getElementById('loginForm').reset();
+        if (!response.ok || !result.success) {
+            alert(result.message || '이메일(아이디) 또는 비밀번호가 일치하지 않습니다.');
+            return;
+        }
 
-    // 토스트 환영 메시지
-    const toastMessage = document.getElementById('toastMessage');
-    if (toastMessage) {
-        toastMessage.innerHTML = `👋 <strong>${matched.name}</strong>님, 환영합니다!`;
-    }
-    const toastElement = document.getElementById('cartToast');
-    if (toastElement && window.bootstrap) {
-        const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
-        toastInstance.show();
+        const user = result.user || { id: id, email: id, name: id.split('@')[0], phone: '' };
+
+        try {
+            localStorage.setItem('vibe_current_user', JSON.stringify({
+                id: user.id || user.email,
+                email: user.email || user.id,
+                name: user.name,
+                phone: user.phone || ''
+            }));
+            let users = [];
+            try {
+                const stored = localStorage.getItem('vibe_users');
+                if (stored) users = JSON.parse(stored);
+            } catch (e) { users = []; }
+            const idx = users.findIndex(u => u.email === user.email || u.id === user.id);
+            if (idx >= 0) {
+                users[idx] = { ...users[idx], ...user };
+            } else {
+                users.push(user);
+            }
+            localStorage.setItem('vibe_users', JSON.stringify(users));
+        } catch (e) {
+            console.error(e);
+        }
+
+        updateUserAuthUI();
+
+        // 모달 닫기 및 폼 리셋
+        const modalEl = document.getElementById('authModal');
+        if (modalEl && window.bootstrap) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+        if (event.target && event.target.reset) {
+            event.target.reset();
+        }
+
+        // 토스트 환영 메시지
+        const toastMessage = document.getElementById('toastMessage');
+        if (toastMessage) {
+            toastMessage.innerHTML = `👋 <strong>${user.name}</strong>님, 환영합니다!`;
+        }
+        const toastElement = document.getElementById('cartToast');
+        if (toastElement && window.bootstrap) {
+            const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+            toastInstance.show();
+        }
+
+        // 마이페이지 또는 전용 로그인 페이지인 경우 페이지 갱신
+        if (window.location.pathname.startsWith('/mypage') || window.location.pathname.startsWith('/auth/login')) {
+            window.location.href = '/mypage';
+        }
+    } catch (err) {
+        console.error('로그인 통신 오류:', err);
+        alert('로그인 처리 중 서버 통신 오류가 발생했습니다.');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
     }
 }
 

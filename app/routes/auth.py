@@ -402,9 +402,76 @@ def login_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not session.get("user_id"):
-            return redirect(url_for("main.index"))
+            return redirect(url_for("auth.login"))
         return func(*args, **kwargs)
     return wrapper
+
+
+# =====================================================
+# 로그인 엔드포인트 (/auth/login)
+# =====================================================
+
+@auth_bp.route("/login", methods=["GET", "POST"])
+def login():
+    """
+    이메일/비밀번호 로그인 처리 및 로그인 페이지 렌더링
+    - GET: 로그인 페이지 (auth/login.html) 노출 (이미 로그인된 경우 /mypage 이동)
+    - POST: Supabase sign_in_with_password 인증 후 세션 수립
+    """
+    if request.method == "POST":
+        data = request.get_json(silent=True) or request.form
+        email = (data.get("email") or data.get("loginId") or "").strip().lower()
+        password = data.get("password") or data.get("loginPassword") or ""
+
+        if not email or not password:
+            return jsonify({"success": False, "message": "이메일과 비밀번호를 모두 입력해주세요."}), 400
+
+        user = None
+        user_name = email.split("@")[0]
+        user_phone = ""
+        user_id = None
+
+        if supabase:
+            try:
+                auth_res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+                if auth_res and auth_res.user:
+                    user = auth_res.user
+                    user_id = user.id
+                    user_meta = getattr(user, "user_metadata", {}) or {}
+                    user_name = user_meta.get("name") or user_meta.get("full_name") or user_name
+                    user_phone = user_meta.get("phone", "")
+            except Exception as e:
+                print(f"[WARN] Supabase 로그인 인증 실패 ({email}): {e}", file=sys.stderr)
+                return jsonify({"success": False, "message": "이메일(아이디) 또는 비밀번호가 일치하지 않습니다."}), 401
+
+        if not user:
+            return jsonify({"success": False, "message": "이메일(아이디) 또는 비밀번호가 일치하지 않습니다."}), 401
+
+        # Flask 세션 수립
+        session["user_id"] = user_id or email
+        session["email"] = email
+        session["name"] = user_name
+        session["phone"] = user_phone
+
+        user_info = {
+            "id": email,
+            "email": email,
+            "name": user_name,
+            "phone": user_phone
+        }
+
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "user": user_info})
+        return redirect(url_for("main.mypage"))
+
+    # GET 요청: 이미 로그인되어 있다면 마이페이지로 이동
+    if session.get("user_id"):
+        return redirect(url_for("main.mypage"))
+
+    return render_template("auth/login.html", mall_name="VIBE-FASHION")
 
 
 # =====================================================

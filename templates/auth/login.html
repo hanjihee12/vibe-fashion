@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}로그인 - {{ mall_name|default('VIBE-FASHION') }}{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden p-4 p-md-5 bg-white">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white p-3 mb-3" style="width: 64px; height: 64px;">
+                        <i class="bi bi-box-arrow-in-right fs-2"></i>
+                    </div>
+                    <h3 class="fw-bold mb-1">로그인</h3>
+                    <p class="text-secondary small">VIBE-FASHION 계정으로 로그인해주세요.</p>
+                </div>
+
+                {% if error_message %}
+                <div class="alert alert-danger alert-dismissible fade show rounded-3 small mb-4" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error_message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endif %}
+
+                <!-- 로그인 폼 -->
+                <form id="pageLoginForm" onsubmit="handleLogin(event)">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">이메일 또는 아이디 (ID)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-person text-muted"></i></span>
+                            <input type="text" class="form-control" id="loginId" name="email" placeholder="이메일 주소를 입력하세요" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold text-secondary">비밀번호</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-lock text-muted"></i></span>
+                            <input type="password" class="form-control" id="loginPassword" name="password" placeholder="비밀번호를 입력하세요" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 py-2.5 rounded-pill fw-bold shadow-sm mb-3">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>로그인
+                    </button>
+
+                    <!-- 소셜 간편 로그인 구분선 및 버튼 -->
+                    <div class="position-relative my-4 text-center">
+                        <hr class="text-secondary opacity-25">
+                        <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">또는 간편 로그인</span>
+                    </div>
+
+                    <a href="/auth/kakao" class="btn w-100 py-2.5 rounded-pill fw-bold d-flex align-items-center justify-content-center text-dark text-decoration-none shadow-sm mb-4" style="background-color: #FEE500; border: 1px solid #FEE500;">
+                        <svg class="me-2" width="20" height="20" viewBox="0 0 24 24" fill="#000000">
+                            <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.84 1.83 5.342 4.606 6.746l-.973 3.567a.5.5 0 0 0 .736.54l4.24-2.802c.456.046.92.07 1.391.07 5.523 0 10-3.582 10-8s-4.477-8-10-8z"/>
+                        </svg>
+                        <span>카카오로 3초 만에 로그인</span>
+                    </a>
+
+                    <div class="text-center small text-secondary">
+                        아직 계정이 없으신가요? 
+                        <a href="javascript:void(0)" onclick="openAuthModal('signup')" class="text-dark fw-bold text-decoration-none ms-1">
+                            회원가입하기
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
