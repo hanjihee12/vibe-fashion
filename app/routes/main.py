@@ -729,6 +729,112 @@ def add_to_cart():
     })
 
 
+@main_bp.route('/cart/<cart_id>', methods=['PATCH'])
+def update_cart_quantity(cart_id):
+    """
+    장바구니 수량 변경 라우트 (PATCH /cart/<cart_id>)
+    - 요청 body: quantity (변경할 새 수량)
+    - 본인 소유의 장바구니 아이템인지 확인 (다른 사용자의 cart_id 접근 차단)
+    - quantity가 1 미만이면 에러
+    - 변경하려는 quantity가 해당 옵션의 stock을 초과하면
+      "재고가 부족합니다(현재 N개)" 에러, 변경하지 않음
+    - 성공 시 UPDATE 후 새 소계(subtotal) 반환
+    """
+    # 1. 로그인 여부 확인
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+    if not user_id:
+        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
+
+    # 2. cart_id 유효성 확인
+    if not is_valid_uuid(cart_id):
+        return jsonify({"success": False, "message": "유효하지 않은 장바구니 ID입니다."}), 400
+
+    # 3. 요청 파라미터 파싱
+    data = request.get_json(silent=True) or request.form or {}
+    raw_quantity = data.get("quantity")
+
+    if raw_quantity is None:
+        return jsonify({"success": False, "message": "새 수량(quantity)이 필요합니다."}), 400
+
+    try:
+        quantity = int(raw_quantity)
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "수량은 정수여야 합니다."}), 400
+
+    if quantity < 1:
+        return jsonify({"success": False, "message": "수량은 1개 이상이어야 합니다."}), 400
+
+    db = supabase_admin or supabase
+    if not db:
+        return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
+
+    # 4. cart_id로 장바구니 아이템 조회
+    cart_res = db.table('carts').select('*').eq('id', cart_id).execute()
+    if not cart_res.data:
+        return jsonify({"success": False, "message": "해당 장바구니 항목을 찾을 수 없습니다."}), 404
+
+    cart_item = cart_res.data[0]
+    cart_user_id = cart_item.get('user_id')
+    option_id = cart_item.get('option_id')
+
+    # 5. 권한 확인 (본인 소유의 장바구니 아이템인지 확인)
+    user_uuid = None
+    if is_valid_uuid(user_id):
+        user_uuid = str(user_id)
+    elif user_email:
+        prof_res = db.table('profiles').select('id').eq('email', user_email).execute()
+        if prof_res.data:
+            user_uuid = str(prof_res.data[0]['id'])
+
+    if not user_uuid:
+        prof_any = db.table('profiles').select('id').limit(1).execute()
+        if prof_any.data:
+            user_uuid = str(prof_any.data[0]['id'])
+
+    if str(cart_user_id) != str(user_uuid):
+        return jsonify({"success": False, "message": "다른 사용자의 장바구니에 접근할 수 없습니다."}), 403
+
+    # 6. 옵션의 재고 확인
+    opt_res = db.table('product_options').select('*').eq('id', option_id).execute()
+    if not opt_res.data:
+        return jsonify({"success": False, "message": "해당 상품 옵션을 찾을 수 없습니다."}), 404
+
+    option_row = opt_res.data[0]
+    stock = int(option_row.get('stock', 0) or 0)
+    additional_price = int(option_row.get('additional_price', 0) or 0)
+
+    # 7. 변경하려는 quantity가 해당 옵션의 stock을 초과하는지 확인
+    if quantity > stock:
+        return jsonify({
+            "success": False,
+            "message": f"재고가 부족합니다(현재 {stock}개)"
+        }), 400
+
+    # 8. quantity 업데이트
+    db.table('carts').update({
+        'quantity': quantity,
+        'updated_at': 'now()'
+    }).eq('id', cart_id).execute()
+
+    # 9. 소계 계산 (product의 price + option의 additional_price) × quantity
+    prod_res = db.table('products').select('price').eq('id', cart_item.get('product_id')).execute()
+    if not prod_res.data:
+        return jsonify({"success": False, "message": "상품 정보를 찾을 수 없습니다."}), 404
+
+    base_price = int(prod_res.data[0].get('price', 0) or 0)
+    unit_price = base_price + additional_price
+    subtotal = unit_price * quantity
+
+    return jsonify({
+        "success": True,
+        "message": "수량이 변경되었습니다",
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "subtotal": subtotal
+    })
+
+
 @main_bp.route('/mypage', methods=['GET', 'POST'])
 @login_required
 def mypage():
