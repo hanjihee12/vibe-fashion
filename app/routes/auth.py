@@ -67,13 +67,11 @@ def get_site_url():
     if site_url:
         return site_url.rstrip("/")
 
-    # 리버스 프록시 / Azure 환경에서 HTTPS 감지
-    scheme = request.headers.get("X-Forwarded-Proto")
-    if not scheme:
-        if request.headers.get("X-ARR-SSL") or (request.host and "azurewebsites.net" in request.host):
-            scheme = "https"
-        else:
-            scheme = request.scheme or "http"
+    # Azure App Service 환경에서는 무조건 HTTPS 강제
+    if request.host and "azurewebsites.net" in request.host:
+        scheme = "https"
+    else:
+        scheme = request.headers.get("X-Forwarded-Proto") or request.scheme or "http"
 
     return f"{scheme}://{request.host}".rstrip("/")
 
@@ -514,6 +512,10 @@ def auth_callback():
     """
     소셜 로그인(카카오톡) 인증 후 돌아오는 콜백 라우트입니다.
     """
+    # 이미 로그인된 세션이 있는 경우 홈으로 이동
+    if session.get("user_id"):
+        return redirect("/")
+
     code = request.args.get("code")
     error = request.args.get("error_description") or request.args.get("error")
 
@@ -525,7 +527,7 @@ def auth_callback():
         ), 400
 
     if code:
-        # 1. 카카오 직접 OAuth 처리 (우선 시도: KOE205 방지 및 일반 앱 완전 호환)
+        # 카카오 공식 OAuth 직접 처리 (KOE205 방지 및 일반 앱 완전 호환)
         site_url = get_site_url()
         callback_url = f"{site_url}/auth/callback"
         try:
@@ -543,122 +545,83 @@ def auth_callback():
             req = urllib.request.Request(
                 token_url,
                 data=encoded_data,
-                headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"}
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 token_json = json.loads(resp.read().decode("utf-8"))
 
             kakao_access_token = token_json.get("access_token")
-            if kakao_access_token:
-                # 사용자 정보 조회 (/v2/user/me)
-                user_req = urllib.request.Request(
-                    "https://kapi.kakao.com/v2/user/me",
-                    headers={
-                        "Authorization": f"Bearer {kakao_access_token}",
-                        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
-                    }
-                )
-                with urllib.request.urlopen(user_req, timeout=10) as user_resp:
-                    user_data = json.loads(user_resp.read().decode("utf-8"))
+            if not kakao_access_token:
+                raise ValueError("카카오 액세스 토큰을 발급받지 못했습니다.")
 
-                kakao_id = str(user_data.get("id", ""))
-                kakao_account = user_data.get("kakao_account", {}) or {}
-                profile = kakao_account.get("profile", {}) or {}
-                nickname = profile.get("nickname") or f"카카오_{kakao_id[:6]}"
-                email = kakao_account.get("email") or f"kakao_{kakao_id}@vibe-fashion.com"
-
-                # Flask 세션 수립
-                session["user_id"] = f"kakao_{kakao_id}"
-                session["email"] = email
-                session["name"] = nickname
-                session["phone"] = ""
-                session["access_token"] = kakao_access_token
-
-                user_info = {
-                    "id": email,
-                    "email": email,
-                    "name": nickname,
-                    "phone": ""
+            # 사용자 정보 조회 (/v2/user/me)
+            user_req = urllib.request.Request(
+                "https://kapi.kakao.com/v2/user/me",
+                headers={
+                    "Authorization": f"Bearer {kakao_access_token}",
+                    "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
+            )
+            with urllib.request.urlopen(user_req, timeout=10) as user_resp:
+                user_data = json.loads(user_resp.read().decode("utf-8"))
 
-                return render_template(
-                    "auth/verify_success.html",
-                    user=user_info,
-                    mall_name="VIBE-FASHION",
-                    is_social=True
-                )
-        except Exception as direct_err:
-            print(f"[WARN] 카카오 직접 토큰 교환 시도 실패 (Supabase PKCE 폴백 시도): {direct_err}", file=sys.stderr)
+            kakao_id = str(user_data.get("id", ""))
+            kakao_account = user_data.get("kakao_account", {}) or {}
+            profile = kakao_account.get("profile", {}) or {}
+            nickname = profile.get("nickname") or f"카카오_{kakao_id[:6]}"
+            email = kakao_account.get("email") or f"kakao_{kakao_id}@vibe-fashion.com"
 
-        # 2. Supabase PKCE 폴백 (기존 연동 호환)
-        if supabase:
+            # Flask 세션 수립
+            session["user_id"] = f"kakao_{kakao_id}"
+            session["email"] = email
+            session["name"] = nickname
+            session["phone"] = ""
+            session["access_token"] = kakao_access_token
+
+            user_info = {
+                "id": email,
+                "email": email,
+                "name": nickname,
+                "phone": ""
+            }
+
+            return render_template(
+                "auth/verify_success.html",
+                user=user_info,
+                mall_name="VIBE-FASHION",
+                is_social=True
+            )
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode("utf-8", errors="ignore")
+            print(f"[ERROR] 카카오 직접 토큰 교환 HTTPError ({http_err.code}): {err_body}", file=sys.stderr)
+            err_msg = "카카오 인증 코드가 만료되었거나 이미 사용되었습니다. 홈 화면에서 카카오 로그인을 다시 눌러주세요."
             try:
-                code_verifier = session.pop("oauth_code_verifier", None)
-                if not code_verifier:
-                    try:
-                        verifier_key = f"{supabase.auth._storage_key}-code-verifier"
-                        code_verifier = supabase.auth._storage.get_item(verifier_key)
-                    except Exception:
-                        pass
+                err_data = json.loads(err_body)
+                if err_data.get("error_code") == "KOE320":
+                    err_msg = "인증 코드가 만료되었거나 이미 사용되었습니다. 홈 화면에서 카카오 로그인을 다시 시도해주세요."
+                else:
+                    err_msg = f"{err_data.get('error_description', err_body)} ({err_data.get('error_code', http_err.code)})"
+            except Exception:
+                pass
 
-                exchange_params = {"auth_code": code}
-                if code_verifier:
-                    exchange_params["code_verifier"] = code_verifier
-                    try:
-                        verifier_key = f"{supabase.auth._storage_key}-code-verifier"
-                        supabase.auth._storage.set_item(verifier_key, code_verifier)
-                    except Exception:
-                        pass
+            return render_template(
+                "auth/verify_error.html",
+                error_title="카카오 로그인 오류",
+                error_message=err_msg
+            ), 400
+        except Exception as direct_err:
+            print(f"[ERROR] 카카오 직접 로그인 오류: {direct_err}", file=sys.stderr)
+            return render_template(
+                "auth/verify_error.html",
+                error_title="카카오 로그인 오류",
+                error_message=f"카카오 로그인 처리 중 오류가 발생했습니다: {str(direct_err)}"
+            ), 400
 
-                res = supabase.auth.exchange_code_for_session(exchange_params)
-                user = res.user
-                session_data = res.session
-
-                if not user:
-                    raise ValueError("사용자 정보를 찾을 수 없습니다.")
-
-                user_meta = getattr(user, "user_metadata", {}) or {}
-                user_name = (
-                    user_meta.get("name")
-                    or user_meta.get("full_name")
-                    or user_meta.get("nickname")
-                    or (user.email.split("@")[0] if user.email else "카카오회원")
-                )
-                user_phone = user_meta.get("phone", "")
-                user_email = user.email or f"kakao_{user.id[:8]}@vibe-fashion.com"
-
-                session["user_id"] = user.id
-                session["email"] = user_email
-                session["name"] = user_name
-                session["phone"] = user_phone
-                if session_data:
-                    session["access_token"] = session_data.access_token
-
-                user_info = {
-                    "id": user_email,
-                    "email": user_email,
-                    "name": user_name,
-                    "phone": user_phone
-                }
-
-                return render_template(
-                    "auth/verify_success.html",
-                    user=user_info,
-                    mall_name="VIBE-FASHION",
-                    is_social=True
-                )
-            except Exception as e:
-                if session.get("user_id"):
-                    return redirect("/")
-
-                print(f"[ERROR] 카카오 OAuth 콜백 처리 오류: {e}", file=sys.stderr)
-                return render_template(
-                    "auth/verify_error.html",
-                    error_title="카카오 로그인 처리 실패",
-                    error_message=f"사용자 세션을 생성하는 중 오류가 발생했습니다: {str(e)}"
-                ), 400
-
-    # 3. 클라이언트 측 해시(#access_token) 처리용 폴백
+    # 클라이언트 측 해시(#access_token) 처리용 폴백
     return render_template(
         "auth/callback.html",
         mall_name="VIBE-FASHION"
