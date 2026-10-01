@@ -570,24 +570,9 @@ def api_product_options(product_id):
             print(f"[ERROR] 옵션 조회 API 오류 ({product_id}, {color}): {e}", file=sys.stderr)
             return jsonify({'status': 'error', 'message': f"데이터 조회 실패: {str(e)}", 'options': []}), 500
 
-    # DB에 데이터가 없으면 더미 데이터로 사이즈 옵션 제공 (테스트용)
-    if not options:
-        import hashlib
-        for s, stk, add_p in [('S', 15, 0), ('M', 20, 0), ('L', 10, 2000), ('XL', 8, 2000)]:
-            # 상품ID + 색상 + 사이즈 기반 일관된 UUID 생성 (테스트용)
-            hash_str = f"{product_id}{color}{s}".encode()
-            hash_digest = hashlib.md5(hash_str).hexdigest()
-            dummy_uuid = f"{hash_digest[:8]}-{hash_digest[8:12]}-{hash_digest[12:16]}-{hash_digest[16:20]}-{hash_digest[20:32]}"
-            
-            options.append({
-                'id': dummy_uuid,
-                'size': s,
-                'stock': stk,
-                'is_soldout': (stk <= 0),
-                'additional_price': add_p,
-                'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
-            })
-
+    # 주의: 더미 데이터는 사용하지 않음 (외래키 제약 때문)
+    # 실제 DB 데이터만 반환합니다
+    
     return jsonify({
         'status': 'success',
         'product_id': product_id,
@@ -656,27 +641,11 @@ def add_to_cart():
 
         # 3. product_options 조회 및 재고 확인
         opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
-        option_row = None
-        is_dummy = False
-        
-        if opt_res.data:
-            option_row = opt_res.data[0]
-        else:
-            # 더미 데이터 검사 (MD5 기반 UUID는 DB에 없으므로 더미로 처리)
-            print(f"[INFO] DB에서 option_id {product_option_id}를 찾지 못했습니다. 더미 데이터로 처리합니다.")
-            is_dummy = True
-            # 테스트용 더미 옵션 생성 (재고는 충분히 설정)
-            option_row = {
-                'id': product_option_id,
-                'product_id': product_id_param or 'unknown-product',  # 요청에서 받은 product_id 사용
-                'stock': 999,  # 더미는 충분한 재고
-                'additional_price': 0
-            }
-
-        if not option_row:
+        if not opt_res.data:
             return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
 
-        product_id = option_row.get('product_id')
+        option_row = opt_res.data[0]
+        product_id_db = option_row.get('product_id')
         stock = int(option_row.get('stock', 0) or 0)
 
         # 요청 수량이 재고보다 많은 경우 즉시 에러 반환
@@ -736,7 +705,7 @@ def add_to_cart():
             # 신규 삽입
             db.table('carts').insert({
                 'user_id': user_uuid,
-                'product_id': product_id,
+                'product_id': product_id_db,
                 'option_id': product_option_id,
                 'quantity': quantity
             }).execute()
