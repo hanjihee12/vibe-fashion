@@ -617,117 +617,120 @@ def is_valid_uuid(val):
 def add_to_cart():
     """
     장바구니 담기 라우트 (POST /cart/add)
-    - 요청 body: product_option_id, quantity
-    - 로그인 안 했으면 /auth/login 으로 리다이렉트
-    - 담기 전에 product_options.stock을 조회해서 요청 수량보다 적으면
-      "재고가 부족합니다(현재 N개)" 에러 반환, DB에 아무 것도 쓰지 않음
-    - carts 테이블에 upsert (같은 옵션이면 수량 누적)
-    - 누적 후 수량이 재고를 초과하게 되는 경우도 동일하게 에러 처리
-    - 성공 시 JSON: {"success": true, "message": "장바구니에 담겼습니다"}
     """
-    # 1. 로그인 여부 확인 (비로그인 시 401 JSON 응답)
-    user_id = session.get("user_id")
-    user_email = session.get("email")
-    if not user_id:
-        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
-
-    # 2. 요청 파라미터 파싱
-    data = request.get_json(silent=True) or request.form or {}
-    product_option_id = str(data.get("product_option_id") or data.get("option_id") or "").strip()
-    raw_quantity = data.get("quantity", 1)
-
     try:
-        quantity = int(raw_quantity)
-    except (ValueError, TypeError):
-        quantity = 1
+        # 1. 로그인 여부 확인
+        user_id = session.get("user_id")
+        user_email = session.get("email")
+        if not user_id:
+            return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
 
-    if not product_option_id:
-        return jsonify({"success": False, "message": "상품 옵션 ID가 필요합니다."}), 400
+        # 2. 요청 파라미터 파싱
+        data = request.get_json(silent=True) or request.form or {}
+        product_option_id = str(data.get("product_option_id") or data.get("option_id") or "").strip()
+        raw_quantity = data.get("quantity", 1)
 
-    if quantity <= 0:
-        return jsonify({"success": False, "message": "수량은 1개 이상이어야 합니다."}), 400
-
-    db = supabase_admin or supabase
-    if not db:
-        return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
-
-    # 3. product_options 조회 및 재고 확인
-    opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
-    if not opt_res.data:
-        return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
-
-    option_row = opt_res.data[0]
-    product_id = option_row.get('product_id')
-    stock = int(option_row.get('stock', 0) or 0)
-
-    # 요청 수량이 재고보다 많은 경우 즉시 에러 반환 (DB에 아무것도 쓰지 않음)
-    if quantity > stock:
-        return jsonify({
-            "success": False,
-            "message": f"재고가 부족합니다(현재 {stock}개)"
-        }), 400
-
-    # 4. 사용자 UUID 확인 (carts 테이블 user_id 외래키용)
-    user_uuid = None
-    if is_valid_uuid(user_id):
-        user_uuid = str(user_id)
-    elif user_email:
-        prof_res = db.table('profiles').select('id').eq('email', user_email).execute()
-        if prof_res.data:
-            user_uuid = str(prof_res.data[0]['id'])
-
-    if not user_uuid and user_email and supabase_admin:
         try:
-            auth_users = supabase_admin.auth.admin.list_users()
-            for u in auth_users:
-                if (u.email or "").lower() == user_email.lower():
-                    user_uuid = str(u.id)
-                    break
-        except Exception:
-            pass
+            quantity = int(raw_quantity)
+        except (ValueError, TypeError):
+            quantity = 1
 
-    if not user_uuid:
-        prof_any = db.table('profiles').select('id').limit(1).execute()
-        if prof_any.data:
-            user_uuid = str(prof_any.data[0]['id'])
+        if not product_option_id:
+            return jsonify({"success": False, "message": "상품 옵션 ID가 필요합니다."}), 400
 
-    if not user_uuid:
-        return jsonify({"success": False, "message": "사용자 프로필 정보를 확인할 수 없습니다."}), 400
+        if quantity <= 0:
+            return jsonify({"success": False, "message": "수량은 1개 이상이어야 합니다."}), 400
 
-    # 5. carts 테이블 기존 수량 확인 (같은 옵션이면 수량 누적 upsert)
-    cart_query = db.table('carts').select('*').eq('user_id', user_uuid).eq('option_id', product_option_id).execute()
-    existing_cart = cart_query.data[0] if cart_query.data else None
+        db = supabase_admin or supabase
+        if not db:
+            return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
 
-    if existing_cart:
-        current_cart_qty = int(existing_cart.get('quantity', 0) or 0)
-        new_total_qty = current_cart_qty + quantity
+        # 3. product_options 조회 및 재고 확인
+        opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
+        if not opt_res.data:
+            return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
 
-        # 누적 후 수량이 재고를 초과하게 되는 경우 에러 처리
-        if new_total_qty > stock:
+        option_row = opt_res.data[0]
+        product_id = option_row.get('product_id')
+        stock = int(option_row.get('stock', 0) or 0)
+
+        # 요청 수량이 재고보다 많은 경우 즉시 에러 반환
+        if quantity > stock:
             return jsonify({
                 "success": False,
                 "message": f"재고가 부족합니다(현재 {stock}개)"
             }), 400
 
-        # 수량 갱신
-        db.table('carts').update({
-            'quantity': new_total_qty
-        }).eq('id', existing_cart['id']).execute()
-    else:
-        # 신규 삽입
-        db.table('carts').insert({
-            'user_id': user_uuid,
-            'product_id': product_id,
-            'option_id': product_option_id,
-            'quantity': quantity
-        }).execute()
+        # 4. 사용자 UUID 확인
+        user_uuid = None
+        if is_valid_uuid(user_id):
+            user_uuid = str(user_id)
+        elif user_email:
+            prof_res = db.table('profiles').select('id').eq('email', user_email).execute()
+            if prof_res.data:
+                user_uuid = str(prof_res.data[0]['id'])
 
-    response = jsonify({
-        "success": True,
-        "message": "장바구니에 담겼습니다"
-    })
-    response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    return response
+        if not user_uuid and user_email and supabase_admin:
+            try:
+                auth_users = supabase_admin.auth.admin.list_users()
+                for u in auth_users:
+                    if (u.email or "").lower() == user_email.lower():
+                        user_uuid = str(u.id)
+                        break
+            except Exception:
+                pass
+
+        if not user_uuid:
+            prof_any = db.table('profiles').select('id').limit(1).execute()
+            if prof_any.data:
+                user_uuid = str(prof_any.data[0]['id'])
+
+        if not user_uuid:
+            return jsonify({"success": False, "message": "사용자 프로필 정보를 확인할 수 없습니다."}), 400
+
+        # 5. carts 테이블 기존 수량 확인 (upsert)
+        cart_query = db.table('carts').select('*').eq('user_id', user_uuid).eq('option_id', product_option_id).execute()
+        existing_cart = cart_query.data[0] if cart_query.data else None
+
+        if existing_cart:
+            current_cart_qty = int(existing_cart.get('quantity', 0) or 0)
+            new_total_qty = current_cart_qty + quantity
+
+            # 누적 후 수량이 재고를 초과하면 에러
+            if new_total_qty > stock:
+                return jsonify({
+                    "success": False,
+                    "message": f"재고가 부족합니다(현재 {stock}개)"
+                }), 400
+
+            # 수량 갱신
+            db.table('carts').update({
+                'quantity': new_total_qty
+            }).eq('id', existing_cart['id']).execute()
+        else:
+            # 신규 삽입
+            db.table('carts').insert({
+                'user_id': user_uuid,
+                'product_id': product_id,
+                'option_id': product_option_id,
+                'quantity': quantity
+            }).execute()
+
+        response = jsonify({
+            "success": True,
+            "message": "장바구니에 담겼습니다"
+        })
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return response
+
+    except Exception as e:
+        print(f"[ERROR] add_to_cart: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "message": f"서버 오류: {str(e)}"
+        }), 500
 
 
 @main_bp.route('/cart/<cart_id>', methods=['PATCH'])
