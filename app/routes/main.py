@@ -662,13 +662,12 @@ def add_to_cart():
             option_row = opt_res.data[0]
         else:
             # 더미 데이터 검사 (MD5 기반 UUID는 DB에 없으므로 더미로 처리)
-            # 패턴: 특정 상품의 MD5 UUID는 항상 같은 값
             print(f"[INFO] DB에서 option_id {product_option_id}를 찾지 못했습니다. 더미 데이터로 처리합니다.")
             is_dummy = True
             # 테스트용 더미 옵션 생성 (재고는 충분히 설정)
             option_row = {
                 'id': product_option_id,
-                'product_id': 'test-product',  # 테스트용 ID
+                'product_id': product_option_id,  # 더미는 product_id를 option_id와 동일하게 설정
                 'stock': 999,  # 더미는 충분한 재고
                 'additional_price': 0
             }
