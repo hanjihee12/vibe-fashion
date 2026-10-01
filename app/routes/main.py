@@ -649,27 +649,35 @@ def add_to_cart():
             return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
 
         # 3. product_options 조회 및 재고 확인
-        # 기본 옵션인지 확인 (default- 접두사)
-        if str(product_option_id).startswith('default-'):
-            return jsonify({
-                "success": False,
-                "message": "죄송합니다. 이 상품은 아직 상세한 재고 정보가 없습니다. 관리자에게 문의해주세요."
-            }), 400
+        # 기본 옵션(default-) 또는 실제 DB 옵션 모두 수용
+        is_default_option = str(product_option_id).startswith('default-')
         
-        opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
-        if not opt_res.data:
-            return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
+        if not is_default_option:
+            # 실제 DB 옵션인 경우
+            opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
+            if not opt_res.data:
+                return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
 
-        option_row = opt_res.data[0]
-        product_id_db = option_row.get('product_id')
-        stock = int(option_row.get('stock', 0) or 0)
+            option_row = opt_res.data[0]
+            product_id_db = option_row.get('product_id')
+            stock = int(option_row.get('stock', 0) or 0)
 
-        # 요청 수량이 재고보다 많은 경우 즉시 에러 반환
-        if quantity > stock:
-            return jsonify({
-                "success": False,
-                "message": f"재고가 부족합니다(현재 {stock}개)"
-            }), 400
+            # 요청 수량이 재고보다 많은 경우 즉시 에러 반환
+            if quantity > stock:
+                return jsonify({
+                    "success": False,
+                    "message": f"재고가 부족합니다(현재 {stock}개)"
+                }), 400
+        else:
+            # 기본 옵션인 경우 (default-로 시작)
+            # 형식: default-{product_id}-{color}-{size}
+            option_parts = product_option_id.split('-')
+            if len(option_parts) >= 4:
+                product_id_db = product_id_param or option_parts[1]
+            else:
+                product_id_db = product_id_param or 'unknown-product'
+            
+            stock = 999  # 기본 옵션은 충분한 재고로 설정
 
         # 4. 사용자 UUID 확인
         user_uuid = None
