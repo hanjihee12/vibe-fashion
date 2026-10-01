@@ -473,8 +473,8 @@ def confirm():
 # 4. 카카오톡 소셜 로그인 시작 (/auth/kakao)
 # =====================================================
 
-KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID", "cf0875435a2f8df114e68d53ade85249")
-KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
+KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID", "f56b0c3d140b845956faa26678b718b3")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "xf2qqwAG9ZWWoYxy3nlHAoLFziJeybhe")
 
 @auth_bp.route("/kakao")
 def kakao_login():
