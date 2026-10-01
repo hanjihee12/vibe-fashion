@@ -483,6 +483,7 @@ async function submitAddToCart() {
                 'Accept': 'application/json'
             },
             body: JSON.stringify({
+                product_id: CURRENT_PRODUCT_ID,
                 product_option_id: selectedOptionId,
                 quantity: currentQuantity
             })

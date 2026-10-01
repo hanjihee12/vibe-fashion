@@ -635,6 +635,7 @@ def add_to_cart():
 
         # 2. 요청 파라미터 파싱
         data = request.get_json(silent=True) or request.form or {}
+        product_id_param = str(data.get("product_id") or "").strip()
         product_option_id = str(data.get("product_option_id") or data.get("option_id") or "").strip()
         raw_quantity = data.get("quantity", 1)
 
@@ -667,7 +668,7 @@ def add_to_cart():
             # 테스트용 더미 옵션 생성 (재고는 충분히 설정)
             option_row = {
                 'id': product_option_id,
-                'product_id': product_option_id,  # 더미는 product_id를 option_id와 동일하게 설정
+                'product_id': product_id_param or 'unknown-product',  # 요청에서 받은 product_id 사용
                 'stock': 999,  # 더미는 충분한 재고
                 'additional_price': 0
             }
