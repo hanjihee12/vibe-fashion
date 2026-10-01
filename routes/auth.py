@@ -61,7 +61,7 @@ def get_serializer():
 def get_site_url():
     """
     현재 애플리케이션의 기본 사이트 URL을 반환합니다.
-    Azure App Service 및 리버스 프록시(HTTPS) 환경을 자동으로 감지합니다.
+    Azure App Service 및 로컬(VS Code 내장 브라우저/127.0.0.1) 환경을 자동 정규화합니다.
     """
     site_url = os.getenv("SITE_URL")
     if site_url:
@@ -69,11 +69,14 @@ def get_site_url():
 
     # Azure App Service 환경에서는 무조건 HTTPS 강제
     if request.host and "azurewebsites.net" in request.host:
-        scheme = "https"
-    else:
-        scheme = request.headers.get("X-Forwarded-Proto") or request.scheme or "http"
+        return f"https://{request.host}".rstrip("/")
 
-    return f"{scheme}://{request.host}".rstrip("/")
+    # 로컬 환경: 127.0.0.1이나 localhost로 접속 시 카카오 등록 표준인 localhost:5000으로 고정
+    host = request.host or "localhost:5000"
+    if "127.0.0.1" in host:
+        host = host.replace("127.0.0.1", "localhost")
+
+    return f"http://{host}".rstrip("/")
 
 
 def get_smtp_accounts():
