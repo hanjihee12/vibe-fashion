@@ -625,11 +625,11 @@ def add_to_cart():
     - 누적 후 수량이 재고를 초과하게 되는 경우도 동일하게 에러 처리
     - 성공 시 JSON: {"success": true, "message": "장바구니에 담겼습니다"}
     """
-    # 1. 로그인 여부 확인 (비로그인 시 /auth/login 으로 리다이렉트)
+    # 1. 로그인 여부 확인 (비로그인 시 401 JSON 응답)
     user_id = session.get("user_id")
     user_email = session.get("email")
     if not user_id:
-        return redirect(url_for('auth.login'))
+        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
 
     # 2. 요청 파라미터 파싱
     data = request.get_json(silent=True) or request.form or {}
@@ -723,10 +723,12 @@ def add_to_cart():
             'quantity': quantity
         }).execute()
 
-    return jsonify({
+    response = jsonify({
         "success": True,
         "message": "장바구니에 담겼습니다"
     })
+    response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    return response
 
 
 @main_bp.route('/cart/<cart_id>', methods=['PATCH'])

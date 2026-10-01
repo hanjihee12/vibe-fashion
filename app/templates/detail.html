@@ -487,9 +487,26 @@ async function submitAddToCart() {
             return;
         }
 
-        const data = await response.json().catch(() => ({}));
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            console.error('JSON 파싱 실패:', parseError);
+            console.error('응답 상태:', response.status, response.statusText);
+        }
 
-        if (!response.ok || !data.success) {
+        if (response.status === 401) {
+            alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        if (!response.ok) {
+            alert(data.message || `오류가 발생했습니다. (${response.status})`);
+            return;
+        }
+
+        if (!data.success) {
             alert(data.message || '장바구니 담기에 실패했습니다.');
             return;
         }
