@@ -6,10 +6,12 @@ Supabase DB 연동을 통해 상품 목록을 동적으로 조회합니다.
 
 import os
 import sys
+import uuid
 import traceback
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from app.routes.auth import login_required
 
 # 1. python-dotenv로 .env에서 Supabase 설정값 읽기
 load_dotenv()
@@ -435,3 +437,90 @@ def api_products():
         "count": len(products),
         "data": products
     })
+
+
+def is_valid_uuid(val):
+    """문자열이 유효한 UUID 형식인지 확인"""
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
+@main_bp.route('/mypage', methods=['GET', 'POST'])
+@login_required
+def mypage():
+    """
+    마이페이지 라우트 (로그인 필수)
+    - 탭1: 내 정보 (이름, 이메일, 기본 배송지 표시 및 수정 폼)
+    - 탭2: 주문 내역 (안내 문구)
+    - 탭3: 환불 내역 (안내 문구)
+    """
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        address = request.form.get('address', '').strip()
+
+        if full_name:
+            session["name"] = full_name
+        if phone:
+            session["phone"] = phone
+
+        if supabase and (user_id or user_email):
+            try:
+                update_data = {
+                    "full_name": full_name,
+                    "phone": phone,
+                    "address": address
+                }
+                # id가 유효한 UUID인 경우 id로 업데이트
+                if is_valid_uuid(user_id):
+                    supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+                elif user_email:
+                    # 소셜 로그인 계정 등 UUID가 아닌 경우 email로 업데이트
+                    supabase.table('profiles').update(update_data).eq('email', user_email).execute()
+            except Exception as e:
+                print(f"[WARN] profiles 업데이트 오류: {e}", file=sys.stderr)
+
+        return redirect(url_for('main.mypage', updated='true'))
+
+    profile = None
+    if supabase and (user_id or user_email):
+        try:
+            # 1. user_id가 UUID인 경우 id로 조회 시도
+            if is_valid_uuid(user_id):
+                res = supabase.table('profiles').select('*').eq('id', user_id).execute()
+                if res.data:
+                    profile = res.data[0]
+            # 2. email로 조회 시도
+            if not profile and user_email:
+                res = supabase.table('profiles').select('*').eq('email', user_email).execute()
+                if res.data:
+                    profile = res.data[0]
+        except Exception as e:
+            print(f"[WARN] profiles 조회 오류: {e}", file=sys.stderr)
+
+    if not profile:
+        profile = {
+            "id": user_id,
+            "email": user_email or "",
+            "full_name": session.get("name") or "고객",
+            "phone": session.get("phone") or "",
+            "address": "",
+            "grade": "BRONZE"
+        }
+
+    updated = request.args.get('updated') == 'true'
+
+    return render_template(
+        'mypage.html',
+        mall_name="VIBE-FASHION",
+        profile=profile,
+        updated=updated
+    )

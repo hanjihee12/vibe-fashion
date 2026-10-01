@@ -522,6 +522,7 @@ function updateUserAuthUI() {
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-1">
                     <li class="px-3 py-1 small text-muted">ID: ${user.id}</li>
+                    <li><a class="dropdown-item small" href="/mypage"><i class="bi bi-person-gear me-1"></i>마이페이지</a></li>
                     <li><hr class="dropdown-divider my-1"></li>
                     <li><a class="dropdown-item small text-danger" href="javascript:void(0)" onclick="handleLogout()"><i class="bi bi-box-arrow-right me-1"></i>로그아웃</a></li>
                 </ul>
