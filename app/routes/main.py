@@ -706,19 +706,14 @@ def add_to_cart():
         # 5. 기본 옵션인 경우 먼저 product_options에 upsert (외래키 제약 해결)
         if is_default_option:
             try:
-                # default 옵션 파싱: default-{product_id}-{color}-{size}
-                parts = product_option_id.split('-', 4)  # default, product_id, color, size
-                color_name = parts[2] if len(parts) > 2 else 'default'
-                size_name = parts[3] if len(parts) > 3 else 'M'
-                
-                # 기본 옵션을 product_options에 upsert
+                # 기본 옵션을 product_options에 upsert (NOT NULL 컬럼 채우기)
                 db.table('product_options').upsert({
                     'id': product_option_id,
                     'product_id': product_id_db,
-                    'color': color_name,
-                    'size': size_name,
+                    'option_name': 'size',  # 기본값
+                    'option_value': 'M',    # 기본값  
+                    'additional_price': 0,
                     'stock': 999,
-                    'additional_price': 0
                 }).execute()
             except Exception as e:
                 print(f"[WARNING] 기본 옵션 upsert 실패: {e}")
