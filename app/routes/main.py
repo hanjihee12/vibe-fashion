@@ -570,6 +570,24 @@ def api_product_options(product_id):
             print(f"[ERROR] 옵션 조회 API 오류 ({product_id}, {color}): {e}", file=sys.stderr)
             return jsonify({'status': 'error', 'message': f"데이터 조회 실패: {str(e)}", 'options': []}), 500
 
+    # DB에 데이터가 없으면 더미 데이터로 사이즈 옵션 제공 (테스트용)
+    if not options:
+        import hashlib
+        for s, stk, add_p in [('S', 15, 0), ('M', 20, 0), ('L', 10, 2000), ('XL', 8, 2000)]:
+            # 상품ID + 색상 + 사이즈 기반 일관된 UUID 생성 (테스트용)
+            hash_str = f"{product_id}{color}{s}".encode()
+            hash_digest = hashlib.md5(hash_str).hexdigest()
+            dummy_uuid = f"{hash_digest[:8]}-{hash_digest[8:12]}-{hash_digest[12:16]}-{hash_digest[16:20]}-{hash_digest[20:32]}"
+            
+            options.append({
+                'id': dummy_uuid,
+                'size': s,
+                'stock': stk,
+                'is_soldout': (stk <= 0),
+                'additional_price': add_p,
+                'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
+            })
+
     return jsonify({
         'status': 'success',
         'product_id': product_id,
