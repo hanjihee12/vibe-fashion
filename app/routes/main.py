@@ -572,9 +572,15 @@ def api_product_options(product_id):
     # DB에 데이터가 없으면 기본 더미 사이즈 제공 (UI 표시용)
     if not options:
         print(f"[INFO] 상품 {product_id}의 {color} 색상에 DB 옵션이 없습니다. 기본 사이즈 제공")
+        import hashlib
         for s, stk, add_p in [('S', 10, 0), ('M', 15, 0), ('L', 8, 2000), ('XL', 5, 2000)]:
+            # UUID 기반 ID 생성 (MD5 해시)
+            hash_str = f"{product_id}{color}{s}".encode()
+            hash_digest = hashlib.md5(hash_str).hexdigest()
+            option_uuid = f"{hash_digest[:8]}-{hash_digest[8:12]}-{hash_digest[12:16]}-{hash_digest[16:20]}-{hash_digest[20:32]}"
+            
             options.append({
-                'id': f"default-{product_id}-{color}-{s}",  # 'default-' 접두사로 표시
+                'id': option_uuid,
                 'size': s,
                 'stock': stk,
                 'is_soldout': False,
@@ -649,15 +655,12 @@ def add_to_cart():
             return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
 
         # 3. product_options 조회 및 재고 확인
-        # 기본 옵션(default-) 또는 실제 DB 옵션 모두 수용
-        is_default_option = str(product_option_id).startswith('default-')
+        # 기본 옵션(DB에 없는 UUID) 또는 실제 DB 옵션 모두 수용
+        opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
+        is_default_option = not opt_res.data  # DB에 없으면 기본 옵션
         
-        if not is_default_option:
+        if opt_res.data:
             # 실제 DB 옵션인 경우
-            opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
-            if not opt_res.data:
-                return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
-
             option_row = opt_res.data[0]
             product_id_db = option_row.get('product_id')
             stock = int(option_row.get('stock', 0) or 0)
@@ -669,14 +672,8 @@ def add_to_cart():
                     "message": f"재고가 부족합니다(현재 {stock}개)"
                 }), 400
         else:
-            # 기본 옵션인 경우 (default-로 시작)
-            # 형식: default-{product_id}-{color}-{size}
-            option_parts = product_option_id.split('-')
-            if len(option_parts) >= 4:
-                product_id_db = product_id_param or option_parts[1]
-            else:
-                product_id_db = product_id_param or 'unknown-product'
-            
+            # 기본 옵션인 경우 (DB에 없는 경우)
+            product_id_db = product_id_param or 'unknown-product'
             stock = 999  # 기본 옵션은 충분한 재고로 설정
 
         # 4. 사용자 UUID 확인
