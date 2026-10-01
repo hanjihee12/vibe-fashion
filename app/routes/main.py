@@ -711,8 +711,7 @@ def add_to_cart():
 
         # 수량 갱신
         db.table('carts').update({
-            'quantity': new_total_qty,
-            'updated_at': 'now()'
+            'quantity': new_total_qty
         }).eq('id', existing_cart['id']).execute()
     else:
         # 신규 삽입
