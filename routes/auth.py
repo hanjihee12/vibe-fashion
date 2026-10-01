@@ -4,6 +4,9 @@ import os
 import time
 import smtplib
 import sys
+import json
+import urllib.request
+import urllib.parse
 from functools import wraps
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -470,44 +473,29 @@ def confirm():
 # 4. 카카오톡 소셜 로그인 시작 (/auth/kakao)
 # =====================================================
 
+KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID", "cf0875435a2f8df114e68d53ade85249")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
+
 @auth_bp.route("/kakao")
 def kakao_login():
     """
     카카오톡 OAuth 소셜 로그인 인증 페이지로 리다이렉트합니다.
+    일반 계정도 별도 비즈앱 전환 없이 닉네임/프로필 기반으로 즉시 로그인되도록
+    카카오 공식 OAuth 엔드포인트를 직접 호출합니다.
     """
     site_url = get_site_url()
     callback_url = f"{site_url}/auth/callback"
 
     try:
-        if not supabase:
-            return render_template(
-                "auth/verify_error.html",
-                error_title="카카오 로그인 오류",
-                error_message="Supabase 연동이 설정되지 않았습니다. 서버 환경 변수를 확인해주세요."
-            ), 500
-
-        res = supabase.auth.sign_in_with_oauth({
-            "provider": "kakao",
-            "options": {
-                "redirect_to": callback_url,
-                "scopes": "profile_nickname,profile_image"
-            }
-        })
-
-        # PKCE code_verifier를 Flask 세션에 안전하게 보관 (멀티 프로세스 / 워커 분산 환경 대응)
-        try:
-            verifier_key = f"{supabase.auth._storage_key}-code-verifier"
-            code_verifier = supabase.auth._storage.get_item(verifier_key)
-            if code_verifier:
-                session["oauth_code_verifier"] = code_verifier
-        except Exception as storage_err:
-            print(f"[WARN] code_verifier 세션 저장 경고: {storage_err}", file=sys.stderr)
-
-        auth_url = getattr(res, "url", None)
-        if auth_url:
-            return redirect(auth_url)
-        else:
-            raise ValueError("카카오 인증 URL을 생성할 수 없습니다.")
+        # 카카오 공식 인가 코드 발급 URL (account_email 요청 배제 -> KOE205 완벽 방지)
+        params = {
+            "client_id": KAKAO_CLIENT_ID,
+            "redirect_uri": callback_url,
+            "response_type": "code",
+            "scope": "profile_nickname,profile_image"
+        }
+        kakao_auth_url = f"https://kauth.kakao.com/oauth/authorize?{urllib.parse.urlencode(params)}"
+        return redirect(kakao_auth_url)
     except Exception as e:
         print(f"[ERROR] 카카오 로그인 시작 실패: {e}", file=sys.stderr)
         return render_template(
@@ -536,77 +524,141 @@ def auth_callback():
             error_message=f"카카오 인증 과정에서 오류가 발생했습니다: {error}"
         ), 400
 
-    # 1. 서버 측 PKCE code 파라미터가 있는 경우
-    if code and supabase:
+    if code:
+        # 1. 카카오 직접 OAuth 처리 (우선 시도: KOE205 방지 및 일반 앱 완전 호환)
+        site_url = get_site_url()
+        callback_url = f"{site_url}/auth/callback"
         try:
-            # 세션에서 보관된 PKCE code_verifier 복원
-            code_verifier = session.pop("oauth_code_verifier", None)
-            if not code_verifier:
-                try:
-                    verifier_key = f"{supabase.auth._storage_key}-code-verifier"
-                    code_verifier = supabase.auth._storage.get_item(verifier_key)
-                except Exception:
-                    pass
-
-            exchange_params = {"auth_code": code}
-            if code_verifier:
-                exchange_params["code_verifier"] = code_verifier
-                try:
-                    verifier_key = f"{supabase.auth._storage_key}-code-verifier"
-                    supabase.auth._storage.set_item(verifier_key, code_verifier)
-                except Exception:
-                    pass
-
-            res = supabase.auth.exchange_code_for_session(exchange_params)
-            user = res.user
-            session_data = res.session
-
-            if not user:
-                raise ValueError("사용자 정보를 찾을 수 없습니다.")
-
-            user_meta = getattr(user, "user_metadata", {}) or {}
-            user_name = (
-                user_meta.get("name")
-                or user_meta.get("full_name")
-                or user_meta.get("nickname")
-                or (user.email.split("@")[0] if user.email else "카카오회원")
-            )
-            user_phone = user_meta.get("phone", "")
-            user_email = user.email or f"kakao_{user.id[:8]}@vibe-fashion.com"
-
-            session["user_id"] = user.id
-            session["email"] = user_email
-            session["name"] = user_name
-            session["phone"] = user_phone
-            if session_data:
-                session["access_token"] = session_data.access_token
-
-            user_info = {
-                "id": user_email,
-                "email": user_email,
-                "name": user_name,
-                "phone": user_phone
+            token_url = "https://kauth.kakao.com/oauth/token"
+            data = {
+                "grant_type": "authorization_code",
+                "client_id": KAKAO_CLIENT_ID,
+                "redirect_uri": callback_url,
+                "code": code,
             }
+            if KAKAO_CLIENT_SECRET:
+                data["client_secret"] = KAKAO_CLIENT_SECRET
 
-            return render_template(
-                "auth/verify_success.html",
-                user=user_info,
-                mall_name="VIBE-FASHION",
-                is_social=True
+            encoded_data = urllib.parse.urlencode(data).encode("utf-8")
+            req = urllib.request.Request(
+                token_url,
+                data=encoded_data,
+                headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"}
             )
-        except Exception as e:
-            # 이미 세션이 수립되어 있는 경우 메인으로 이동
-            if session.get("user_id"):
-                return redirect("/")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                token_json = json.loads(resp.read().decode("utf-8"))
 
-            print(f"[ERROR] 카카오 OAuth 콜백 처리 오류: {e}", file=sys.stderr)
-            return render_template(
-                "auth/verify_error.html",
-                error_title="카카오 로그인 처리 실패",
-                error_message=f"사용자 세션을 생성하는 중 오류가 발생했습니다: {str(e)}"
-            ), 400
+            kakao_access_token = token_json.get("access_token")
+            if kakao_access_token:
+                # 사용자 정보 조회 (/v2/user/me)
+                user_req = urllib.request.Request(
+                    "https://kapi.kakao.com/v2/user/me",
+                    headers={
+                        "Authorization": f"Bearer {kakao_access_token}",
+                        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+                    }
+                )
+                with urllib.request.urlopen(user_req, timeout=10) as user_resp:
+                    user_data = json.loads(user_resp.read().decode("utf-8"))
 
-    # 2. 클라이언트 측 해시(#access_token) 처리용 폴백
+                kakao_id = str(user_data.get("id", ""))
+                kakao_account = user_data.get("kakao_account", {}) or {}
+                profile = kakao_account.get("profile", {}) or {}
+                nickname = profile.get("nickname") or f"카카오_{kakao_id[:6]}"
+                email = kakao_account.get("email") or f"kakao_{kakao_id}@vibe-fashion.com"
+
+                # Flask 세션 수립
+                session["user_id"] = f"kakao_{kakao_id}"
+                session["email"] = email
+                session["name"] = nickname
+                session["phone"] = ""
+                session["access_token"] = kakao_access_token
+
+                user_info = {
+                    "id": email,
+                    "email": email,
+                    "name": nickname,
+                    "phone": ""
+                }
+
+                return render_template(
+                    "auth/verify_success.html",
+                    user=user_info,
+                    mall_name="VIBE-FASHION",
+                    is_social=True
+                )
+        except Exception as direct_err:
+            print(f"[WARN] 카카오 직접 토큰 교환 시도 실패 (Supabase PKCE 폴백 시도): {direct_err}", file=sys.stderr)
+
+        # 2. Supabase PKCE 폴백 (기존 연동 호환)
+        if supabase:
+            try:
+                code_verifier = session.pop("oauth_code_verifier", None)
+                if not code_verifier:
+                    try:
+                        verifier_key = f"{supabase.auth._storage_key}-code-verifier"
+                        code_verifier = supabase.auth._storage.get_item(verifier_key)
+                    except Exception:
+                        pass
+
+                exchange_params = {"auth_code": code}
+                if code_verifier:
+                    exchange_params["code_verifier"] = code_verifier
+                    try:
+                        verifier_key = f"{supabase.auth._storage_key}-code-verifier"
+                        supabase.auth._storage.set_item(verifier_key, code_verifier)
+                    except Exception:
+                        pass
+
+                res = supabase.auth.exchange_code_for_session(exchange_params)
+                user = res.user
+                session_data = res.session
+
+                if not user:
+                    raise ValueError("사용자 정보를 찾을 수 없습니다.")
+
+                user_meta = getattr(user, "user_metadata", {}) or {}
+                user_name = (
+                    user_meta.get("name")
+                    or user_meta.get("full_name")
+                    or user_meta.get("nickname")
+                    or (user.email.split("@")[0] if user.email else "카카오회원")
+                )
+                user_phone = user_meta.get("phone", "")
+                user_email = user.email or f"kakao_{user.id[:8]}@vibe-fashion.com"
+
+                session["user_id"] = user.id
+                session["email"] = user_email
+                session["name"] = user_name
+                session["phone"] = user_phone
+                if session_data:
+                    session["access_token"] = session_data.access_token
+
+                user_info = {
+                    "id": user_email,
+                    "email": user_email,
+                    "name": user_name,
+                    "phone": user_phone
+                }
+
+                return render_template(
+                    "auth/verify_success.html",
+                    user=user_info,
+                    mall_name="VIBE-FASHION",
+                    is_social=True
+                )
+            except Exception as e:
+                if session.get("user_id"):
+                    return redirect("/")
+
+                print(f"[ERROR] 카카오 OAuth 콜백 처리 오류: {e}", file=sys.stderr)
+                return render_template(
+                    "auth/verify_error.html",
+                    error_title="카카오 로그인 처리 실패",
+                    error_message=f"사용자 세션을 생성하는 중 오류가 발생했습니다: {str(e)}"
+                ), 400
+
+    # 3. 클라이언트 측 해시(#access_token) 처리용 폴백
     return render_template(
         "auth/callback.html",
         mall_name="VIBE-FASHION"
