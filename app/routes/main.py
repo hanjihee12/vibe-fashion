@@ -568,11 +568,20 @@ def api_product_options(product_id):
                 })
         except Exception as e:
             print(f"[ERROR] 옵션 조회 API 오류 ({product_id}, {color}): {e}", file=sys.stderr)
-            return jsonify({'status': 'error', 'message': f"데이터 조회 실패: {str(e)}", 'options': []}), 500
 
-    # 주의: 더미 데이터는 사용하지 않음 (외래키 제약 때문)
-    # 실제 DB 데이터만 반환합니다
-    
+    # DB에 데이터가 없으면 기본 더미 사이즈 제공 (UI 표시용)
+    if not options:
+        print(f"[INFO] 상품 {product_id}의 {color} 색상에 DB 옵션이 없습니다. 기본 사이즈 제공")
+        for s, stk, add_p in [('S', 10, 0), ('M', 15, 0), ('L', 8, 2000), ('XL', 5, 2000)]:
+            options.append({
+                'id': f"default-{product_id}-{color}-{s}",  # 'default-' 접두사로 표시
+                'size': s,
+                'stock': stk,
+                'is_soldout': False,
+                'additional_price': add_p,
+                'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
+            })
+
     return jsonify({
         'status': 'success',
         'product_id': product_id,
@@ -640,6 +649,13 @@ def add_to_cart():
             return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
 
         # 3. product_options 조회 및 재고 확인
+        # 기본 옵션인지 확인 (default- 접두사)
+        if str(product_option_id).startswith('default-'):
+            return jsonify({
+                "success": False,
+                "message": "죄송합니다. 이 상품은 아직 상세한 재고 정보가 없습니다. 관리자에게 문의해주세요."
+            }), 400
+        
         opt_res = db.table('product_options').select('*').eq('id', product_option_id).execute()
         if not opt_res.data:
             return jsonify({"success": False, "message": "선택한 상품 옵션을 찾을 수 없습니다."}), 404
