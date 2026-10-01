@@ -1006,3 +1006,146 @@ def change_password():
     except Exception as e:
         print(f"[ERROR] 비밀번호 변경 오류: {e}", file=sys.stderr)
         return redirect(url_for('main.mypage', pwd_error=f"비밀번호 변경 처리 중 오류가 발생했습니다: {str(e)}"))
+
+
+@main_bp.route('/api/cart', methods=['GET'])
+def get_cart_items():
+    """
+    장바구니 아이템 목록 API (GET /api/cart)
+    - 로그인한 사용자의 모든 장바구니 아이템 반환
+    - 응답: [
+        {
+            "id": "cart-id",
+            "product_id": "product-id",
+            "option_id": "option-id",
+            "product_name": "상품명",
+            "color": "색상",
+            "size": "사이즈",
+            "base_price": 19900,
+            "additional_price": 0,
+            "unit_price": 19900,
+            "quantity": 2,
+            "subtotal": 39800,
+            "stock": 25,
+            "image": "url"
+        },
+        ...
+      ]
+    """
+    # 1. 로그인 여부 확인
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+    
+    if not user_id:
+        return jsonify({"success": False, "message": "로그인이 필요합니다."}), 401
+
+    db = supabase_admin or supabase
+    if not db:
+        return jsonify({"success": False, "message": "데이터베이스 연결에 실패했습니다."}), 500
+
+    # 2. 사용자 UUID 확인
+    user_uuid = None
+    if is_valid_uuid(user_id):
+        user_uuid = str(user_id)
+    elif user_email:
+        prof_res = db.table('profiles').select('id').eq('email', user_email).execute()
+        if prof_res.data:
+            user_uuid = str(prof_res.data[0]['id'])
+
+    if not user_uuid:
+        prof_any = db.table('profiles').select('id').limit(1).execute()
+        if prof_any.data:
+            user_uuid = str(prof_any.data[0]['id'])
+
+    if not user_uuid:
+        return jsonify({"success": False, "message": "사용자 프로필 정보를 확인할 수 없습니다."}), 400
+
+    # 3. carts 조회 (user_id로 필터링)
+    try:
+        carts_res = db.table('carts').select('*').eq('user_id', user_uuid).order('created_at', desc=False).execute()
+        carts_data = carts_res.data or []
+    except Exception as e:
+        print(f"[ERROR] 장바구니 조회 오류: {e}", file=sys.stderr)
+        return jsonify({"success": False, "message": "장바구니 조회 중 오류가 발생했습니다."}), 500
+
+    cart_items = []
+    for cart in carts_data:
+        cart_id = cart.get('id')
+        product_id = cart.get('product_id')
+        option_id = cart.get('option_id')
+        quantity = int(cart.get('quantity', 1) or 1)
+
+        # 4. 상품 정보 조회
+        try:
+            prod_res = db.table('products').select('*').eq('id', product_id).execute()
+            if not prod_res.data:
+                continue
+            product = prod_res.data[0]
+            product_name = product.get('name', '상품명')
+            base_price = int(product.get('price', 0) or 0)
+        except Exception as e:
+            print(f"[WARN] 상품 조회 오류 ({product_id}): {e}", file=sys.stderr)
+            continue
+
+        # 5. 옵션 정보 조회 (color, size, stock, additional_price)
+        try:
+            opt_res = db.table('product_options').select('*').eq('id', option_id).execute()
+            if not opt_res.data:
+                continue
+            option = opt_res.data[0]
+            color = option.get('color', 'N/A')
+            size = option.get('size', 'N/A')
+            stock = int(option.get('stock', 0) or 0)
+            additional_price = int(option.get('additional_price', 0) or 0)
+        except Exception as e:
+            print(f"[WARN] 옵션 조회 오류 ({option_id}): {e}", file=sys.stderr)
+            continue
+
+        # 6. 상품 이미지 조회
+        image_url = ""
+        try:
+            img_res = db.table('product_images').select('image_url').eq('product_id', product_id).limit(1).execute()
+            if img_res.data:
+                image_url = img_res.data[0].get('image_url', '')
+        except Exception as e:
+            print(f"[WARN] 이미지 조회 오류 ({product_id}): {e}", file=sys.stderr)
+
+        # 7. 소계 계산
+        unit_price = base_price + additional_price
+        subtotal = unit_price * quantity
+
+        cart_items.append({
+            "id": cart_id,
+            "product_id": product_id,
+            "option_id": option_id,
+            "product_name": product_name,
+            "color": color,
+            "size": size,
+            "base_price": base_price,
+            "additional_price": additional_price,
+            "unit_price": unit_price,
+            "quantity": quantity,
+            "subtotal": subtotal,
+            "stock": stock,
+            "image": image_url
+        })
+
+    # 8. 응답 구성
+    total_price = sum(item['subtotal'] for item in cart_items)
+    total_quantity = sum(item['quantity'] for item in cart_items)
+
+    return jsonify({
+        "success": True,
+        "items": cart_items,
+        "total_quantity": total_quantity,
+        "total_price": total_price,
+        "item_count": len(cart_items)
+    })
+
+
+@main_bp.route('/cart', methods=['GET'])
+def view_cart():
+    """
+    장바구니 페이지 (GET /cart)
+    """
+    return render_template('cart.html', mall_name="VIBE-FASHION")

@@ -526,6 +526,13 @@ async function submitAddToCart() {
             const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
             toastInstance.show();
         }
+
+        // 헤더의 장바구니 카운트 업데이트
+        const cartCountElement = document.getElementById('cart-count') || document.getElementById('cartCount');
+        if (cartCountElement) {
+            const currentCount = parseInt(cartCountElement.textContent) || 0;
+            cartCountElement.textContent = currentCount + currentQuantity;
+        }
     } catch (err) {
         console.error('장바구니 추가 오류:', err);
         alert('장바구니 추가 중 통신 오류가 발생했습니다.');
