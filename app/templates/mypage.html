@@ -64,6 +64,20 @@
                     </div>
                     {% endif %}
 
+                    {% if pwd_success %}
+                    <div class="alert alert-success alert-dismissible fade show rounded-3 small mb-4" role="alert">
+                        <i class="bi bi-check-circle-fill me-1"></i>{{ pwd_success }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    {% if pwd_error %}
+                    <div class="alert alert-danger alert-dismissible fade show rounded-3 small mb-4" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ pwd_error }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
                     <div class="tab-content" id="mypageTabContent">
                         <!-- 탭 1: 내 정보 -->
                         <div class="tab-pane fade show active" id="info-tab-pane" role="tabpanel" aria-labelledby="info-tab" tabindex="0">
@@ -108,6 +122,50 @@
                                             <i class="bi bi-check2-circle me-1"></i>정보 수정 저장
                                         </button>
                                     </form>
+
+                                    {% if not is_social_user %}
+                                    <!-- [비밀번호 변경 섹션] 이메일/비밀번호 가입 사용자에게만 표시 -->
+                                    <hr class="my-5 text-secondary opacity-25">
+
+                                    <div class="mt-4">
+                                        <div class="d-flex align-items-center gap-2 mb-3">
+                                            <i class="bi bi-shield-lock-fill text-dark fs-5"></i>
+                                            <h5 class="fw-bold mb-0 text-dark">비밀번호 변경</h5>
+                                        </div>
+                                        <p class="text-secondary small mb-4">현재 비밀번호를 확인한 후 새로운 비밀번호로 변경할 수 있습니다.</p>
+
+                                        <form method="POST" action="{{ url_for('main.change_password') }}">
+                                            <div class="mb-3">
+                                                <label for="currentPassword" class="form-label small fw-semibold text-secondary">현재 비밀번호</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-key text-muted"></i></span>
+                                                    <input type="password" class="form-control border-start-0 ps-0" id="currentPassword" name="current_password" placeholder="현재 비밀번호를 입력하세요" required>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="newPassword" class="form-label small fw-semibold text-secondary">새 비밀번호</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                                                    <input type="password" class="form-control border-start-0 ps-0" id="newPassword" name="new_password" placeholder="새 비밀번호 (4자리 이상)" required>
+                                                </div>
+                                                <div class="form-text small text-muted">비밀번호는 최소 4자리 이상이어야 합니다.</div>
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <label for="confirmPassword" class="form-label small fw-semibold text-secondary">새 비밀번호 확인</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock-fill text-muted"></i></span>
+                                                    <input type="password" class="form-control border-start-0 ps-0" id="confirmPassword" name="confirm_password" placeholder="새 비밀번호를 다시 입력하세요" required>
+                                                </div>
+                                            </div>
+
+                                            <button type="submit" class="btn btn-outline-dark rounded-pill px-4 py-2 fw-semibold">
+                                                <i class="bi bi-shield-check me-1"></i>비밀번호 변경
+                                            </button>
+                                        </form>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

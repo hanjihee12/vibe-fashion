@@ -17,9 +17,11 @@ from app.routes.auth import login_required
 load_dotenv()
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
+SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 
 # Supabase 클라이언트 초기화 (오류 발생 시에도 앱 시작이 중단되지 않도록 예외 처리)
 supabase: Client = None
+supabase_admin: Client = None
 if SUPABASE_URL and SUPABASE_ANON_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -28,6 +30,12 @@ if SUPABASE_URL and SUPABASE_ANON_KEY:
         traceback.print_exc(file=sys.stderr)
 else:
     print("[WARN] .env에 SUPABASE_URL 또는 SUPABASE_ANON_KEY가 설정되지 않았습니다.", file=sys.stderr)
+
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    except Exception as e:
+        print(f"[WARN] Supabase 관리자 클라이언트 초기화 실패: {e}", file=sys.stderr)
 
 # 2. Blueprint 인스턴스 생성
 main_bp = Blueprint('main', __name__)
@@ -516,11 +524,108 @@ def mypage():
             "grade": "BRONZE"
         }
 
+    # 소셜 로그인 사용자 여부 판별 (kakao_, ms_ 등 또는 이메일 로그인 여부)
+    # user_id가 kakao_ 로 시작하거나, email이 @vibe-fashion.com 가상 도메인인 경우 소셜
+    # 또는 supabase auth 사용자 정보를 조회해 provider 확인
+    is_social_user = False
+    if str(user_id or "").startswith("kakao_") or str(user_id or "").startswith("ms_") or "@vibe-fashion.com" in str(user_email or ""):
+        is_social_user = True
+    elif supabase_admin and is_valid_uuid(user_id):
+        try:
+            auth_user = supabase_admin.auth.admin.get_user_by_id(str(user_id))
+            if auth_user and auth_user.user:
+                provider = (auth_user.user.app_metadata or {}).get("provider", "email")
+                if provider != "email":
+                    is_social_user = True
+        except Exception:
+            pass
+
     updated = request.args.get('updated') == 'true'
+    pwd_success = request.args.get('pwd_success')
+    pwd_error = request.args.get('pwd_error')
 
     return render_template(
         'mypage.html',
         mall_name="VIBE-FASHION",
         profile=profile,
-        updated=updated
+        updated=updated,
+        is_social_user=is_social_user,
+        pwd_success=pwd_success,
+        pwd_error=pwd_error
     )
+
+
+@main_bp.route('/mypage/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """
+    비밀번호 변경 처리 라우트 (POST)
+    - 기존 비밀번호 검증 (Supabase sign_in_with_password 방식 확인)
+    - 새 비밀번호 검증 (최소 4자리 이상)
+    - 새 비밀번호와 기존 비밀번호 동일 여부 체크
+    - Supabase update_user_by_id()를 통한 안전한 비밀번호 변경
+    """
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+
+    current_password = request.form.get("current_password", "").strip()
+    new_password = request.form.get("new_password", "").strip()
+    confirm_password = request.form.get("confirm_password", "").strip()
+
+    if not current_password:
+        return redirect(url_for('main.mypage', pwd_error="현재 비밀번호를 입력해주세요."))
+
+    if not new_password:
+        return redirect(url_for('main.mypage', pwd_error="새 비밀번호를 입력해주세요."))
+
+    # Day 4 이메일 가입 검증 조건: 4자리 이상
+    if len(new_password) < 4:
+        return redirect(url_for('main.mypage', pwd_error="새 비밀번호를 4자리 이상 입력해주세요."))
+
+    if new_password != confirm_password:
+        return redirect(url_for('main.mypage', pwd_error="새 비밀번호와 확인용 비밀번호가 일치하지 않습니다."))
+
+    if new_password == current_password:
+        return redirect(url_for('main.mypage', pwd_error="새로운 비밀번호가 현재 비밀번호와 동일합니다."))
+
+    if not user_email:
+        return redirect(url_for('main.mypage', pwd_error="사용자 이메일 정보를 확인할 수 없습니다."))
+
+    # 1. 기존 비밀번호 검증 (Supabase 재인증 시도)
+    auth_verified = False
+    auth_uid = None
+    if supabase:
+        try:
+            auth_res = supabase.auth.sign_in_with_password({
+                "email": user_email,
+                "password": current_password
+            })
+            if auth_res and auth_res.user:
+                auth_verified = True
+                auth_uid = auth_res.user.id
+        except Exception:
+            auth_verified = False
+
+    if not auth_verified:
+        return redirect(url_for('main.mypage', pwd_error="현재 비밀번호가 일치하지 않습니다."))
+
+    # 2. Supabase update_user_by_id() 사용해 비밀번호 변경
+    target_uid = auth_uid or (str(user_id) if is_valid_uuid(user_id) else None)
+    if not target_uid:
+        return redirect(url_for('main.mypage', pwd_error="비밀번호를 변경할 대상 계정 ID를 찾을 수 없습니다."))
+
+    try:
+        admin_client = supabase_admin or supabase
+        if hasattr(admin_client.auth, 'admin') and hasattr(admin_client.auth.admin, 'update_user_by_id'):
+            admin_client.auth.admin.update_user_by_id(
+                target_uid,
+                {"password": new_password}
+            )
+        else:
+            # fallback: 일반 auth.update_user
+            supabase.auth.update_user({"password": new_password})
+
+        return redirect(url_for('main.mypage', pwd_success="비밀번호가 변경되었습니다."))
+    except Exception as e:
+        print(f"[ERROR] 비밀번호 변경 오류: {e}", file=sys.stderr)
+        return redirect(url_for('main.mypage', pwd_error=f"비밀번호 변경 처리 중 오류가 발생했습니다: {str(e)}"))
