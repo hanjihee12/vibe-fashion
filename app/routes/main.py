@@ -43,7 +43,7 @@ main_bp = Blueprint('main', __name__)
 # 카테고리별 고화질 더미 상품 데이터 (상의, 하의, 악세사리)
 DUMMY_TOP_PRODUCTS = [
     {
-        "id": "11111111-1111-4111-8111-111111111111",  # 실제 DB 상품 ID
+        "id": "top-2",
         "name": "클래식 릴렉스드 옥스포드 셔츠",
         "category": "상의",
         "price": "49,000원",
@@ -57,7 +57,7 @@ DUMMY_TOP_PRODUCTS = [
         "reviews": 95
     },
     {
-        "id": "22222222-2222-4222-8222-222222222222",  # 실제 DB 상품 ID
+        "id": "top-4",
         "name": "시그니처 오버핏 후드 티셔츠",
         "category": "상의",
         "price": "59,000원",
@@ -70,41 +70,65 @@ DUMMY_TOP_PRODUCTS = [
         "rating": 4.7,
         "reviews": 64
     },
+    {
+        "id": "top-5",
+        "name": "어텀 캐시미어 블렌드 가디건",
+        "category": "상의",
+        "price": "79,000원",
+        "price_str": "79,000원",
+        "badge": "FALL NEW",
+        "badge_color": "warning text-dark",
+        "thumbnail_url": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&auto=format&fit=crop&q=80",
+        "description": "가을 무드를 완성하는 차분한 카멜 톤과 부드러운 캐시미어 블렌드 루즈핏 가디건",
+        "rating": 4.9,
+        "reviews": 110
+    },
+    {
+        "id": "top-6",
+        "name": "브라운 스웨이드 오버 셔켓",
+        "category": "상의",
+        "price": "89,000원",
+        "price_str": "89,000원",
+        "badge": "AUTUMN",
+        "badge_color": "danger",
+        "thumbnail_url": "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=800&auto=format&fit=crop&q=80",
+        "description": "고급스러운 인조 스웨이드 텍스처로 셔츠와 자켓 겸용으로 연출하는 가을 아우터 셔츠",
+        "rating": 4.8,
+        "reviews": 73
+    },
+    {
+        "id": "top-7",
+        "name": "웜 하프 터틀넥 골지 니트",
+        "category": "상의",
+        "price": "46,000원",
+        "price_str": "46,000원",
+        "badge": "SEASON",
+        "badge_color": "secondary",
+        "thumbnail_url": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80",
+        "image": "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&auto=format&fit=crop&q=80",
+        "description": "찬 바람을 막아주는 포근한 하프 터틀넥과 신축성 좋은 립 골지 짜임의 가을 이너 니트",
+        "rating": 4.9,
+        "reviews": 134
+    }
 ]
 
 DUMMY_BOTTOM_PRODUCTS = [
     {
-        "id": "22222222-2222-4222-8222-222222222222",
+        "id": "bot-2",
         "name": "와이드 핏 투턱 세미 슬랙스",
         "category": "하의",
-        "price": "39,900원",
-        "price_str": "39,900원",
-        "badge": "NEW",
-        "badge_color": "primary",
+        "price": "59,000원",
+        "price_str": "59,000원",
+        "badge": "HOT",
+        "badge_color": "warning text-dark",
         "thumbnail_url": "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800&auto=format&fit=crop&q=80",
         "image": "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800&auto=format&fit=crop&q=80",
-        "description": "편안한 착용감과 내추럴한 와이드 실루엣이 돋보이는 사계절용 데님 팬츠입니다.",
+        "description": "유려하게 떨어지는 투턱 주름 디테일로 길고 슬림한 다리 라인을 연출하는 슬랙스",
         "rating": 4.8,
         "reviews": 175
-    }
-]
-
-DUMMY_ACC_PRODUCTS = [
-    {
-        "id": "33333333-3333-4333-8333-333333333333",
-        "name": "미니멀 삼각 힙색",
-        "category": "악세사리",
-        "price": "34,900원",
-        "price_str": "34,900원",
-        "badge": "NEW",
-        "badge_color": "primary",
-        "thumbnail_url": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&auto=format&fit=crop&q=80",
-        "image": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&auto=format&fit=crop&q=80",
-        "description": "미니멀한 디자인의 삼각 형태 힙색입니다.",
-        "rating": 4.9,
-        "reviews": 154
-    }
-]
+    },
     {
         "id": "bot-3",
         "name": "빈티지 스트레이트 워싱 진",
@@ -597,6 +621,28 @@ def is_valid_uuid(val):
         return False
 
 
+def ensure_db_product_id(db, product_id):
+    """더미 상품(top-4 등)은 DB에 UUID 행을 만들어 그 id를 반환. 알 수 없으면 None."""
+    if is_valid_uuid(product_id):
+        return str(product_id)
+    dummy = next((p for p in DUMMY_PRODUCTS if str(p.get('id')) == str(product_id)), None)
+    if not dummy:
+        return None
+    new_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"vibe-fashion:{product_id}"))
+    digits = ''.join(filter(str.isdigit, str(dummy.get('price_str', dummy.get('price', '0')))))
+    price = int(digits) if digits else 0
+    # is_active=False: 메인 목록에 중복 노출되지 않도록 함
+    db.table('products').upsert({
+        'id': new_id,
+        'name': dummy.get('name'),
+        'description': dummy.get('description', ''),
+        'price': price,
+        'original_price': price,
+        'is_active': False,
+    }).execute()
+    return new_id
+
+
 @main_bp.route('/cart/add', methods=['POST'])
 def add_to_cart():
     """
@@ -649,7 +695,9 @@ def add_to_cart():
                 }), 400
         else:
             # 기본 옵션인 경우 (DB에 없는 경우)
-            product_id_db = product_id_param or 'unknown-product'
+            product_id_db = ensure_db_product_id(db, product_id_param)
+            if not product_id_db:
+                return jsonify({"success": False, "message": "상품 정보를 찾을 수 없습니다."}), 404
             stock = 999  # 기본 옵션은 충분한 재고로 설정
 
         # 4. 사용자 UUID 확인
