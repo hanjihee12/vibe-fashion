@@ -542,7 +542,7 @@ function updateUserAuthUI() {
 
 /**
  * 로그인/회원가입 모달 열기
- * @param {'signup'|'login'} mode - 열 탭 모드
+ * @param {'signup'|'login'|'forgot'} mode - 열 탭 모드
  */
 function openAuthModal(mode = 'signup') {
     const modalEl = document.getElementById('authModal');
@@ -550,6 +550,7 @@ function openAuthModal(mode = 'signup') {
 
     // 모달 열 때 폼 상태 초기화
     resetSignupForm();
+    resetForgotForm();
 
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.show();
@@ -558,6 +559,12 @@ function openAuthModal(mode = 'signup') {
         const signupTab = document.getElementById('signup-tab');
         if (signupTab) {
             const tab = bootstrap.Tab.getOrCreateInstance(signupTab);
+            tab.show();
+        }
+    } else if (mode === 'forgot') {
+        const forgotTab = document.getElementById('forgot-tab');
+        if (forgotTab) {
+            const tab = bootstrap.Tab.getOrCreateInstance(forgotTab);
             tab.show();
         }
     } else {
@@ -580,6 +587,95 @@ function resetSignupForm() {
     }
     if (sentPane) {
         sentPane.classList.add('d-none');
+    }
+}
+
+/**
+ * 비밀번호 찾기 폼 상태 초기화
+ */
+function resetForgotForm() {
+    const form = document.getElementById('forgotForm');
+    const sentPane = document.getElementById('forgotSentPane');
+    if (form) {
+        form.classList.remove('d-none');
+    }
+    if (sentPane) {
+        sentPane.classList.add('d-none');
+    }
+}
+
+/**
+ * 비밀번호 찾기 제출 처리 (재설정 링크 발송)
+ */
+async function handleForgotPassword(event) {
+    event.preventDefault();
+
+    const emailInput = document.getElementById('forgotEmail');
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+
+    if (!email || !email.includes('@')) {
+        alert('올바른 이메일 주소를 입력해주세요.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('forgotSubmitBtn');
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '재설정 링크 받기';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>전송 중...';
+    }
+
+    try {
+        const response = await fetch('/auth/forgot-password', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ email: email })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            const forgotForm = document.getElementById('forgotForm');
+            const forgotSentPane = document.getElementById('forgotSentPane');
+            const sentForgotEmailDisplay = document.getElementById('sentForgotEmailDisplay');
+            const previewResetLink = document.getElementById('previewResetLink');
+
+            if (sentForgotEmailDisplay) {
+                sentForgotEmailDisplay.textContent = email;
+            }
+
+            if (previewResetLink && result.preview_url) {
+                previewResetLink.href = result.preview_url;
+            }
+
+            if (forgotForm) forgotForm.classList.add('d-none');
+            if (forgotSentPane) forgotSentPane.classList.remove('d-none');
+
+            // 토스트 알림
+            const toastMessage = document.getElementById('toastMessage');
+            if (toastMessage) {
+                toastMessage.innerHTML = `🔑 <strong>${email}</strong>으로 비밀번호 재설정 메일이 발송되었습니다.`;
+            }
+            const toastElement = document.getElementById('cartToast');
+            if (toastElement && window.bootstrap) {
+                const toastInstance = bootstrap.Toast.getOrCreateInstance(toastElement);
+                toastInstance.show();
+            }
+        } else {
+            alert(result.message || '비밀번호 재설정 링크 발송에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('비밀번호 재설정 링크 발송 오류:', error);
+        alert('서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+        }
     }
 }
 

@@ -39,8 +39,10 @@ auth_bp = Blueprint(
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 supabase: Client = None
+supabase_admin: Client = None
 if SUPABASE_URL and SUPABASE_ANON_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -48,6 +50,12 @@ if SUPABASE_URL and SUPABASE_ANON_KEY:
         print(f"[WARN] auth.py: Supabase 클라이언트 초기화 실패: {e}", file=sys.stderr)
 else:
     print("[WARN] auth.py: .env에 SUPABASE_URL 또는 SUPABASE_ANON_KEY가 설정되지 않았습니다.", file=sys.stderr)
+
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    except Exception as e:
+        print(f"[WARN] auth.py: Supabase 관리자 클라이언트 초기화 실패: {e}", file=sys.stderr)
 
 # =====================================================
 # 이메일 발송 & 인증 링크 유틸리티
@@ -244,6 +252,113 @@ def send_signup_email(to_email, user_name, verify_url):
             return True
         except Exception as e:
             print(f"[WARN] Gmail 계정 ({smtp_user}) 발송 실패/한도초과, 다음 계정 시도: {e}", file=sys.stderr)
+
+    return False
+
+
+def send_reset_password_email(to_email, user_name, reset_url):
+    """
+    비밀번호 재설정 링크가 담긴 이메일을 발송합니다.
+    """
+    global _account_index
+    subject = f"[VIBE-FASHION] {user_name}님, 비밀번호 재설정 링크입니다."
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #212529; background-color: #f8f9fa; padding: 20px; }}
+            .container {{ max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 1px solid #e9ecef; }}
+            .header {{ background: #111827; padding: 32px 24px; text-align: center; color: #ffffff; }}
+            .header h1 {{ margin: 0; font-size: 24px; letter-spacing: 2px; font-weight: 800; }}
+            .header p {{ margin: 8px 0 0; font-size: 13px; color: #9ca3af; }}
+            .content {{ padding: 36px 32px; }}
+            .welcome {{ font-size: 18px; font-weight: 700; margin-bottom: 16px; }}
+            .btn-box {{ text-align: center; margin: 32px 0; }}
+            .btn {{ display: inline-block; background: #111827; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }}
+            .footer {{ background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-top: 1px solid #e9ecef; }}
+            .link-text {{ word-break: break-all; font-size: 12px; color: #0d6efd; background: #f1f5f9; padding: 12px; border-radius: 8px; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>VIBE-FASHION</h1>
+                <p>비밀번호 재설정 안내</p>
+            </div>
+            <div class="content">
+                <div class="welcome">안녕하세요, {user_name}님!</div>
+                <p>회원님의 계정에 대한 비밀번호 재설정 요청이 접수되었습니다.</p>
+                <p>아래 <strong>[비밀번호 재설정하기]</strong> 버튼을 클릭하시면 새로운 비밀번호를 설정할 수 있는 페이지로 이동합니다.</p>
+                
+                <div class="btn-box">
+                    <a href="{reset_url}" class="btn" target="_blank">비밀번호 재설정하기</a>
+                </div>
+
+                <p style="font-size: 13px; color: #6c757d;">
+                    * 본 링크는 발송 후 1시간 동안 유효합니다.<br>
+                    * 본인이 비밀번호 재설정을 요청하지 않으셨다면 이 메일을 무시해주세요. 기존 비밀번호가 유지됩니다.
+                </p>
+
+                <div class="link-text">
+                    버튼 클릭이 되지 않을 경우 아래 링크를 복사하여 브라우저 주소창에 붙여넣어 주세요:<br>
+                    <a href="{reset_url}" style="color: #0d6efd;">{reset_url}</a>
+                </div>
+            </div>
+            <div class="footer">
+                © 2026 VIBE-FASHION. All rights reserved.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    # 콘솔 로그 출력 (개발 및 확인용)
+    print("\n" + "=" * 70, file=sys.stdout)
+    print(" [VIBE-FASHION] 비밀번호 재설정 메일이 발송되었습니다.", file=sys.stdout)
+    print(f" 수신자: {to_email} ({user_name} 님)", file=sys.stdout)
+    print(f" 재설정 링크: {reset_url}", file=sys.stdout)
+    print("=" * 70 + "\n", file=sys.stdout)
+
+    accounts = get_smtp_accounts()
+    if not accounts:
+        return True
+
+    total_accounts = len(accounts)
+    start_index = _account_index % total_accounts
+
+    for attempt in range(total_accounts):
+        current_idx = (start_index + attempt) % total_accounts
+        acc = accounts[current_idx]
+        smtp_user = acc["user"]
+        smtp_password = acc["password"]
+        smtp_host = acc.get("host", "smtp.gmail.com")
+        smtp_port = acc.get("port", 587)
+        smtp_from = acc.get("from", smtp_user)
+
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"VIBE-FASHION <{smtp_from}>"
+            msg["To"] = to_email
+            msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
+                server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_from, [to_email], msg.as_string())
+            server.quit()
+            
+            _account_index = (current_idx + 1) % total_accounts
+            print(f"[SUCCESS] 비밀번호 재설정 메일 발송 성공 (사용 계정: {smtp_user}): {to_email}", file=sys.stdout)
+            return True
+        except Exception as e:
+            print(f"[WARN] Gmail 계정 ({smtp_user}) 발송 실패, 다음 계정 시도: {e}", file=sys.stderr)
 
     return False
 
@@ -472,6 +587,201 @@ def login():
         return redirect(url_for("main.mypage"))
 
     return render_template("auth/login.html", mall_name="VIBE-FASHION")
+
+
+# =====================================================
+# 비밀번호 찾기 (재설정 메일 발송 및 재설정 라우트)
+# =====================================================
+
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    """
+    비밀번호 재설정 링크 발송 요청 처리 (AJAX 비동기 / 폼 공통)
+    """
+    data = request.get_json(silent=True) or request.form
+    email = (data.get("email") or "").strip().lower()
+
+    if not email or "@" not in email:
+        return jsonify({"success": False, "message": "올바른 이메일 주소를 입력해주세요."}), 400
+
+    # 1. 소셜 로그인 가상 이메일 검사
+    if "@vibe-fashion.com" in email:
+        return jsonify({
+            "success": False,
+            "message": "카카오 등 소셜 로그인으로 가입된 계정입니다. 노란색 [카카오 로그인] 버튼을 이용해주세요."
+        }), 400
+
+    target_user_id = None
+    target_user_name = email.split("@")[0]
+
+    # 2. Supabase Auth 사용자 목록 또는 profiles 테이블에서 사용자 조회
+    if supabase_admin:
+        try:
+            users = supabase_admin.auth.admin.list_users()
+            for u in users:
+                if (u.email or "").lower() == email:
+                    target_user_id = u.id
+                    user_meta = getattr(u, "user_metadata", {}) or {}
+                    target_user_name = user_meta.get("name") or user_meta.get("full_name") or target_user_name
+                    # 소셜 프로바이더인지 확인
+                    provider = (getattr(u, "app_metadata", {}) or {}).get("provider", "email")
+                    if provider != "email":
+                        return jsonify({
+                            "success": False,
+                            "message": f"{provider.capitalize()} 소셜 로그인 계정입니다. 해당 소셜 로그인 버튼을 이용해주세요."
+                        }), 400
+                    break
+        except Exception as e:
+            print(f"[WARN] Supabase admin list_users 오류: {e}", file=sys.stderr)
+
+    if not target_user_id and supabase:
+        try:
+            res = supabase.table("profiles").select("*").eq("email", email).execute()
+            if res.data:
+                profile = res.data[0]
+                target_user_id = profile.get("id")
+                target_user_name = profile.get("full_name") or target_user_name
+        except Exception as e:
+            print(f"[WARN] profiles 조회 오류: {e}", file=sys.stderr)
+
+    if not target_user_id:
+        return jsonify({
+            "success": False,
+            "message": "해당 이메일로 가입된 계정을 찾을 수 없습니다. 이메일 주소를 다시 확인해주세요."
+        }), 404
+
+    # 3. 1시간 유효 서명 토큰 생성
+    serializer = get_serializer()
+    token_payload = {
+        "email": email,
+        "user_id": str(target_user_id),
+        "ts": time.time(),
+    }
+    token = serializer.dumps(token_payload, salt="password-reset")
+
+    site_url = get_site_url()
+    reset_url = f"{site_url}/auth/reset-password?token={token}"
+
+    # 4. 이메일 발송
+    email_sent = send_reset_password_email(email, target_user_name, reset_url)
+
+    # 5. 응답 (개발/테스트 편의를 위해 preview_url 포함)
+    return jsonify({
+        "success": True,
+        "message": f"{email} 주소로 비밀번호 재설정 링크를 전송했습니다. 메일함을 확인해주세요.",
+        "preview_url": reset_url,
+        "email_sent": email_sent
+    })
+
+
+@auth_bp.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    """
+    비밀번호 재설정 페이지 표시 (GET) 및 새 비밀번호 저장 처리 (POST)
+    """
+    serializer = get_serializer()
+
+    if request.method == "POST":
+        token = request.form.get("token") or request.args.get("token")
+        new_password = (request.form.get("new_password") or "").strip()
+        confirm_password = (request.form.get("confirm_password") or "").strip()
+
+        if not token:
+            return render_template(
+                "auth/verify_error.html",
+                error_title="유효하지 않은 요청",
+                error_message="인증 토큰이 누락되었습니다."
+            ), 400
+
+        try:
+            payload = serializer.loads(token, salt="password-reset", max_age=3600)
+        except SignatureExpired:
+            return render_template(
+                "auth/verify_error.html",
+                error_title="재설정 링크 만료",
+                error_message="비밀번호 재설정 링크가 만료되었습니다 (유효시간 1시간). 비밀번호 찾기를 다시 진행해주세요."
+            ), 400
+        except BadSignature:
+            return render_template(
+                "auth/verify_error.html",
+                error_title="유효하지 않은 링크",
+                error_message="변조되었거나 올바르지 않은 재설정 링크입니다."
+            ), 400
+
+        email = payload.get("email")
+        user_id = payload.get("user_id")
+
+        if not new_password or len(new_password) < 4:
+            return render_template(
+                "auth/reset_password.html",
+                token=token,
+                email=email,
+                error_message="새 비밀번호를 4자리 이상 입력해주세요.",
+                mall_name="VIBE-FASHION"
+            ), 400
+
+        if new_password != confirm_password:
+            return render_template(
+                "auth/reset_password.html",
+                token=token,
+                email=email,
+                error_message="새 비밀번호와 확인용 비밀번호가 일치하지 않습니다.",
+                mall_name="VIBE-FASHION"
+            ), 400
+
+        # Supabase를 통해 비밀번호 변경
+        try:
+            admin_client = supabase_admin or supabase
+            if hasattr(admin_client.auth, "admin") and hasattr(admin_client.auth.admin, "update_user_by_id"):
+                admin_client.auth.admin.update_user_by_id(user_id, {"password": new_password})
+            else:
+                supabase.auth.update_user({"password": new_password})
+        except Exception as e:
+            print(f"[ERROR] 비밀번호 재설정 실패: {e}", file=sys.stderr)
+            return render_template(
+                "auth/reset_password.html",
+                token=token,
+                email=email,
+                error_message=f"비밀번호 변경 처리 중 오류가 발생했습니다: {str(e)}",
+                mall_name="VIBE-FASHION"
+            ), 400
+
+        return render_template(
+            "auth/reset_password_success.html",
+            email=email,
+            mall_name="VIBE-FASHION"
+        )
+
+    # GET 요청: 토큰 유효성 검사
+    token = request.args.get("token")
+    if not token:
+        return render_template(
+            "auth/verify_error.html",
+            error_title="비정상적인 접근",
+            error_message="비밀번호 재설정 토큰이 필요합니다. 메일함의 링크를 다시 클릭해주세요."
+        ), 400
+
+    try:
+        payload = serializer.loads(token, salt="password-reset", max_age=3600)
+    except SignatureExpired:
+        return render_template(
+            "auth/verify_error.html",
+            error_title="재설정 링크 만료",
+            error_message="비밀번호 재설정 링크가 만료되었습니다 (유효시간 1시간). 비밀번호 찾기를 다시 신청해주세요."
+        ), 400
+    except BadSignature:
+        return render_template(
+            "auth/verify_error.html",
+            error_title="유효하지 않은 링크",
+            error_message="변조되었거나 올바르지 않은 재설정 링크입니다."
+        ), 400
+
+    return render_template(
+        "auth/reset_password.html",
+        token=token,
+        email=payload.get("email"),
+        mall_name="VIBE-FASHION"
+    )
 
 
 # =====================================================

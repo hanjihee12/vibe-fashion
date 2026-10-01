@@ -415,6 +415,11 @@
                                 <i class="bi bi-box-arrow-in-right me-1"></i>로그인
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold rounded-pill" id="forgot-tab" data-bs-toggle="pill" data-bs-target="#forgot-tab-pane" type="button" role="tab" aria-controls="forgot-tab-pane" aria-selected="false">
+                                <i class="bi bi-key-fill me-1"></i>비밀번호 찾기
+                            </button>
+                        </li>
                     </ul>
                     <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -529,7 +534,12 @@
                                     </div>
                                 </div>
                                 <div class="mb-4">
-                                    <label class="form-label small fw-semibold">비밀번호</label>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label small fw-semibold mb-0">비밀번호</label>
+                                        <a href="javascript:void(0)" onclick="openAuthModal('forgot')" class="small text-secondary text-decoration-none" style="font-size: 12px;">
+                                            <i class="bi bi-question-circle me-1"></i>비밀번호 찾기
+                                        </a>
+                                    </div>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
                                         <input type="password" class="form-control" id="loginPassword" placeholder="비밀번호를 입력하세요" required>
@@ -552,6 +562,67 @@
                                 </a>
                             </form>
                         </div>
+
+                        <!-- 비밀번호 찾기 탭 폼 -->
+                        <div class="tab-pane fade" id="forgot-tab-pane" role="tabpanel" aria-labelledby="forgot-tab" tabindex="0">
+                            <!-- 1단계: 이메일 입력 폼 -->
+                            <form id="forgotForm" onsubmit="handleForgotPassword(event)">
+                                <div class="text-center mb-3">
+                                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light text-dark p-3 mb-2" style="width: 56px; height: 56px;">
+                                        <i class="bi bi-key-fill fs-3"></i>
+                                    </div>
+                                    <h6 class="fw-bold mb-1">비밀번호를 잊으셨나요?</h6>
+                                    <p class="text-secondary small mb-0">가입하신 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label small fw-semibold">가입 이메일 주소 <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" class="form-control" id="forgotEmail" placeholder="example@email.com" required>
+                                    </div>
+                                </div>
+
+                                <button type="submit" id="forgotSubmitBtn" class="btn btn-dark w-100 py-2 rounded-pill fw-bold mb-2">
+                                    <i class="bi bi-send-check me-1"></i>재설정 링크 받기
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary w-100 py-2 rounded-pill small fw-semibold" onclick="openAuthModal('login')">
+                                    로그인으로 돌아가기
+                                </button>
+                            </form>
+
+                            <!-- 2단계: 메일 발송 완료 안내 화면 -->
+                            <div id="forgotSentPane" class="d-none text-center py-2">
+                                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success p-3 mb-3" style="width: 72px; height: 72px;">
+                                    <i class="bi bi-check2-circle" style="font-size: 2.2rem;"></i>
+                                </div>
+                                <h5 class="fw-bold mb-2">재설정 메일을 전송했습니다!</h5>
+                                <p class="text-secondary small mb-3">
+                                    <strong id="sentForgotEmailDisplay" class="text-dark bg-light px-2 py-1 rounded border">user@example.com</strong> 으로<br>
+                                    비밀번호 재설정 링크가 포함된 메일이 발송되었습니다.
+                                </p>
+                                <div class="alert alert-info py-2 px-3 small rounded-3 mb-3 text-start">
+                                    <i class="bi bi-clock-history me-1"></i>메일함에 도착한 링크를 클릭하여 1시간 이내에 새 비밀번호를 설정해주세요.
+                                </div>
+
+                                <!-- 개발/테스트용 바로가기 링크 -->
+                                <div id="devResetLinkCard" class="bg-light border rounded-3 p-3 text-start small mb-3">
+                                    <div class="fw-semibold text-muted mb-1"><i class="bi bi-link-45deg me-1"></i>테스트용 재설정 링크 (개발 모드):</div>
+                                    <a href="#" id="previewResetLink" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold w-100">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>새 비밀번호 설정 바로가기
+                                    </a>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-secondary w-100 py-2 rounded-pill small fw-semibold" onclick="resetForgotForm()">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i>다시 요청하기
+                                    </button>
+                                    <button type="button" class="btn btn-dark w-100 py-2 rounded-pill small fw-semibold" onclick="openAuthModal('login')">
+                                        로그인하기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -559,6 +630,6 @@
     </div>
 
     <!-- 6. 커스텀 프론트엔드 자바스크립트 -->
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20261001_v3"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20261001_v4"></script>
 </body>
 </html>
