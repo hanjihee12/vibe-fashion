@@ -385,14 +385,21 @@ def index():
     )
 
 
+@main_bp.route('/products/<product_id>')
 @main_bp.route('/product/<product_id>')
 def product_detail(product_id):
     """
-    상품 상세 정보 라우트 (단일 상품 확인)
+    상품 상세 정보 라우트 (GET /products/<product_id>)
+    - Supabase에서 product_id로 상품 정보 조회
+    - 상품 이미지(목록 및 대표이미지), 이름, 가격(할인가/정가), 설명 표시
+    - product_options 테이블에서 해당 상품의 색상(color) 목록을 DISTINCT로 조회
     """
     product = None
-    if supabase:
+    colors = []
+
+    if supabase and is_valid_uuid(product_id):
         try:
+            # 1. 상품 기본 정보 및 이미지, 카테고리 조회
             res = (
                 supabase.table('products')
                 .select('*, product_images(*), categories(name)')
@@ -402,35 +409,183 @@ def product_detail(product_id):
             if res.data:
                 item = res.data[0]
                 raw_price = item.get('price', 0)
+                raw_orig_price = item.get('original_price') or raw_price
+
                 try:
-                    price_str = f"{int(raw_price):,}원"
+                    price_val = int(raw_price)
+                    price_str = f"{price_val:,}원"
                 except (ValueError, TypeError):
+                    price_val = 0
                     price_str = f"{raw_price}원"
 
-                images = item.get('product_images') or []
-                thumbnail_url = images[0].get('image_url') if images else f"https://picsum.photos/seed/{product_id}/600/800"
-                category_name = item.get('categories', {}).get('name') if isinstance(item.get('categories'), dict) else 'ITEM'
+                try:
+                    orig_price_val = int(raw_orig_price)
+                    orig_price_str = f"{orig_price_val:,}원"
+                except (ValueError, TypeError):
+                    orig_price_val = 0
+                    orig_price_str = f"{raw_orig_price}원"
+
+                # 할인율 계산
+                discount_rate = 0
+                if orig_price_val > price_val and orig_price_val > 0:
+                    discount_rate = int(round((orig_price_val - price_val) / orig_price_val * 100))
+
+                # 이미지 목록 정렬
+                raw_images = item.get('product_images') or []
+                sorted_images = sorted(raw_images, key=lambda x: x.get('display_order', 0))
+                image_urls = [img.get('image_url') for img in sorted_images if img.get('image_url')]
+
+                thumbnail_url = ''
+                for img in sorted_images:
+                    if img.get('is_thumbnail'):
+                        thumbnail_url = img.get('image_url')
+                        break
+                if not thumbnail_url and image_urls:
+                    thumbnail_url = image_urls[0]
+                if not thumbnail_url:
+                    thumbnail_url = f"https://picsum.photos/seed/{product_id}/800/1000"
+                    image_urls = [thumbnail_url]
+
+                category_name = item.get('categories', {}).get('name') if isinstance(item.get('categories'), dict) else '패션'
 
                 product = {
-                    'id': item.get('id'),
+                    'id': str(item.get('id')),
                     'name': item.get('name'),
-                    'price': price_str,
+                    'price': price_val,
                     'price_str': price_str,
+                    'original_price': orig_price_val,
+                    'original_price_str': orig_price_str,
+                    'discount_rate': discount_rate,
                     'thumbnail_url': thumbnail_url,
-                    'image': thumbnail_url,
+                    'images': image_urls,
                     'description': item.get('description', ''),
-                    'category': category_name
+                    'category': category_name,
+                    'is_active': item.get('is_active', True)
                 }
+
+                # 2. product_options 테이블에서 해당 상품의 색상(color) 목록을 DISTINCT로 조회
+                opt_res = (
+                    supabase.table('product_options')
+                    .select('color')
+                    .eq('product_id', product_id)
+                    .not_.is_('color', 'null')
+                    .execute()
+                )
+                if opt_res.data:
+                    seen = set()
+                    for row in opt_res.data:
+                        c = row.get('color')
+                        if c and c not in seen:
+                            seen.add(c)
+                            colors.append(c)
         except Exception as e:
             print(f"[ERROR] 상품 상세 조회 실패 ({product_id}): {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
 
     if not product:
         # 더미 데이터 fallback
-        product = next((p for p in DUMMY_PRODUCTS if str(p.get("id")) == str(product_id)), None)
+        dummy = next((p for p in DUMMY_PRODUCTS if str(p.get("id")) == str(product_id)), None)
+        if dummy:
+            raw_p = dummy.get('price_str', dummy.get('price', '0원'))
+            num_p = 49000
+            try:
+                num_p = int(''.join(filter(str.isdigit, str(raw_p))))
+            except Exception:
+                pass
+            product = {
+                'id': str(dummy.get('id')),
+                'name': dummy.get('name'),
+                'price': num_p,
+                'price_str': f"{num_p:,}원",
+                'original_price': int(num_p * 1.2),
+                'original_price_str': f"{int(num_p * 1.2):,}원",
+                'discount_rate': 20,
+                'thumbnail_url': dummy.get('thumbnail_url') or dummy.get('image'),
+                'images': [dummy.get('thumbnail_url') or dummy.get('image')],
+                'description': dummy.get('description', ''),
+                'category': dummy.get('category', '패션'),
+                'is_active': True
+            }
+            colors = ["Black", "White", "Gray"]
 
     if not product:
         return render_template('404.html', message="상품을 찾을 수 없습니다."), 404
-    return render_template('detail.html', product=product, mall_name="VIBE-FASHION")
+
+    return render_template(
+        'detail.html',
+        product=product,
+        colors=colors,
+        mall_name="VIBE-FASHION"
+    )
+
+
+@main_bp.route('/api/products/<product_id>/options')
+def api_product_options(product_id):
+    """
+    선택한 색상에 해당하는 사이즈 목록 및 재고/추가금 조회 API
+    Query Param: color (예: ?color=Black)
+    """
+    color = request.args.get('color', '').strip()
+    if not color:
+        return jsonify({
+            'status': 'error',
+            'message': '색상(color) 파라미터가 필요합니다.',
+            'options': []
+        }), 400
+
+    options = []
+    if supabase and is_valid_uuid(product_id):
+        try:
+            res = (
+                supabase.table('product_options')
+                .select('id, size, stock, additional_price')
+                .eq('product_id', product_id)
+                .eq('color', color)
+                .not_.is_('size', 'null')
+                .execute()
+            )
+            raw_data = res.data or []
+
+            # 사이즈 순서 정렬 (S, M, L, XL 등 표준 정렬)
+            size_order = {'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5, 'XXL': 6, 'FREE': 7}
+            sorted_data = sorted(
+                raw_data,
+                key=lambda x: size_order.get(str(x.get('size')).upper(), 99)
+            )
+
+            for opt in sorted_data:
+                stock_val = int(opt.get('stock', 0) or 0)
+                add_price = int(opt.get('additional_price', 0) or 0)
+                options.append({
+                    'id': str(opt.get('id')),
+                    'size': opt.get('size'),
+                    'stock': stock_val,
+                    'is_soldout': (stock_val <= 0),
+                    'additional_price': add_price,
+                    'additional_price_str': f"+{add_price:,}원" if add_price > 0 else ""
+                })
+        except Exception as e:
+            print(f"[ERROR] 옵션 조회 API 오류 ({product_id}, {color}): {e}", file=sys.stderr)
+            return jsonify({'status': 'error', 'message': str(e), 'options': []}), 500
+
+    if not options:
+        # 더미 데이터 fallback
+        for s, stk, add_p in [('S', 0, 0), ('M', 25, 0), ('L', 10, 2000)]:
+            options.append({
+                'id': f"dummy-{color}-{s}",
+                'size': s,
+                'stock': stk,
+                'is_soldout': (stk <= 0),
+                'additional_price': add_p,
+                'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
+            })
+
+    return jsonify({
+        'status': 'success',
+        'product_id': product_id,
+        'color': color,
+        'options': options
+    })
 
 
 @main_bp.route('/api/products')

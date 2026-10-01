@@ -163,10 +163,12 @@
             <div class="col">
                 <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
                     <div class="position-relative product-img-wrapper">
-                        <img src="{{ product.thumbnail_url }}" 
-                             class="card-img-top product-img" 
-                             alt="{{ product.name }}"
-                             loading="lazy">
+                        <a href="/products/{{ product.id }}">
+                            <img src="{{ product.thumbnail_url }}" 
+                                 class="card-img-top product-img" 
+                                 alt="{{ product.name }}"
+                                 loading="lazy">
+                        </a>
                         <span class="badge bg-{{ product.badge_color|default('primary') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
                             {{ product.badge|default('TOP') }}
                         </span>
@@ -189,7 +191,9 @@
                             <span class="badge bg-light text-primary border small">{{ product.category|default('상의') }}</span>
                         </div>
                         <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
-                            {{ product.name }}
+                            <a href="/products/{{ product.id }}" class="text-dark text-decoration-none hover-primary">
+                                {{ product.name }}
+                            </a>
                         </h5>
                         {% if product.description %}
                         <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
@@ -234,10 +238,12 @@
             <div class="col">
                 <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
                     <div class="position-relative product-img-wrapper">
-                        <img src="{{ product.thumbnail_url }}" 
-                             class="card-img-top product-img" 
-                             alt="{{ product.name }}"
-                             loading="lazy">
+                        <a href="/products/{{ product.id }}">
+                            <img src="{{ product.thumbnail_url }}" 
+                                 class="card-img-top product-img" 
+                                 alt="{{ product.name }}"
+                                 loading="lazy">
+                        </a>
                         <span class="badge bg-{{ product.badge_color|default('success') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
                             {{ product.badge|default('BOTTOM') }}
                         </span>
@@ -260,7 +266,9 @@
                             <span class="badge bg-light text-success border small">{{ product.category|default('하의') }}</span>
                         </div>
                         <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
-                            {{ product.name }}
+                            <a href="/products/{{ product.id }}" class="text-dark text-decoration-none hover-primary">
+                                {{ product.name }}
+                            </a>
                         </h5>
                         {% if product.description %}
                         <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
@@ -305,10 +313,12 @@
             <div class="col">
                 <div class="card h-100 border-0 shadow-sm product-card overflow-hidden">
                     <div class="position-relative product-img-wrapper">
-                        <img src="{{ product.thumbnail_url }}" 
-                             class="card-img-top product-img" 
-                             alt="{{ product.name }}"
-                             loading="lazy">
+                        <a href="/products/{{ product.id }}">
+                            <img src="{{ product.thumbnail_url }}" 
+                                 class="card-img-top product-img" 
+                                 alt="{{ product.name }}"
+                                 loading="lazy">
+                        </a>
                         <span class="badge bg-{{ product.badge_color|default('info') }} position-absolute top-0 start-0 m-3 px-2 py-1 shadow-sm fw-bold">
                             {{ product.badge|default('ACC') }}
                         </span>
@@ -331,7 +341,9 @@
                             <span class="badge bg-light text-info border small">{{ product.category|default('악세사리') }}</span>
                         </div>
                         <h5 class="card-title fw-bold fs-6 text-dark mb-1 text-truncate" title="{{ product.name }}">
-                            {{ product.name }}
+                            <a href="/products/{{ product.id }}" class="text-dark text-decoration-none hover-primary">
+                                {{ product.name }}
+                            </a>
                         </h5>
                         {% if product.description %}
                         <p class="card-text text-secondary small text-truncate-2 mb-3 flex-grow-1">
