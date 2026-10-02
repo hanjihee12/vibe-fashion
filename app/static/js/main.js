@@ -46,17 +46,33 @@ function saveCart() {
  * 네비게이션 및 장바구니 뷰 UI 업데이트
  */
 function updateCartUI() {
-    const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-    const cartCountBadge = document.getElementById('cartCount');
-    if (cartCountBadge) {
-        cartCountBadge.innerText = totalCount;
-        if (totalCount > 0) {
-            cartCountBadge.classList.add('animate__animated', 'animate__pulse');
+    // 1. 헤더 뱃지 탐색 (cart-count, cartCount)
+    const cartCountBadges = document.querySelectorAll('#cart-count, #cartCount, .cart-count-badge');
+    const localCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+    // 2. 즉시 로컬 카운트 먼저 반영 (지연 없이 즉시 숫자 증가)
+    cartCountBadges.forEach(badge => {
+        badge.innerText = localCount;
+        if (localCount > 0) {
+            badge.classList.add('animate__animated', 'animate__pulse');
             setTimeout(() => {
-                cartCountBadge.classList.remove('animate__animated', 'animate__pulse');
+                badge.classList.remove('animate__animated', 'animate__pulse');
             }, 500);
         }
-    }
+    });
+
+    // 3. 서버 DB 장바구니 수량 비동기 동기화
+    fetch('/api/cart')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+            if (data && data.success && typeof data.total_quantity !== 'undefined') {
+                const finalCount = Math.max(data.total_quantity, localCount);
+                cartCountBadges.forEach(badge => {
+                    badge.innerText = finalCount;
+                });
+            }
+        })
+        .catch(() => {});
 
     // 모달 내부 장바구니 목록 렌더링
     renderCartModalList();

@@ -5,8 +5,12 @@ Supabase DB 연동을 통해 상품 목록을 동적으로 조회합니다.
 """
 
 import os
+import re
 import sys
 import uuid
+import time
+import random
+import datetime
 import traceback
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
@@ -959,7 +963,7 @@ def mypage():
     """
     마이페이지 라우트 (로그인 필수)
     - 탭1: 내 정보 (이름, 이메일, 기본 배송지 표시 및 수정 폼)
-    - 탭2: 주문 내역 (안내 문구)
+    - 탭2: 주문 내역 (실제 orders + order_items 조회)
     - 탭3: 환불 내역 (안내 문구)
     """
     user_id = session.get("user_id")
@@ -994,18 +998,23 @@ def mypage():
         return redirect(url_for('main.mypage', updated='true'))
 
     profile = None
-    if supabase and (user_id or user_email):
+    user_uuid = None
+    db = supabase_admin or supabase
+
+    if db and (user_id or user_email):
         try:
             # 1. user_id가 UUID인 경우 id로 조회 시도
             if is_valid_uuid(user_id):
-                res = supabase.table('profiles').select('*').eq('id', user_id).execute()
+                res = db.table('profiles').select('*').eq('id', user_id).execute()
                 if res.data:
                     profile = res.data[0]
+                    user_uuid = str(profile['id'])
             # 2. email로 조회 시도
             if not profile and user_email:
-                res = supabase.table('profiles').select('*').eq('email', user_email).execute()
+                res = db.table('profiles').select('*').eq('email', user_email).execute()
                 if res.data:
                     profile = res.data[0]
+                    user_uuid = str(profile['id'])
         except Exception as e:
             print(f"[WARN] profiles 조회 오류: {e}", file=sys.stderr)
 
@@ -1019,9 +1028,47 @@ def mypage():
             "grade": "BRONZE"
         }
 
+    # 주문 내역 조회 (orders + order_items)
+    orders = []
+    if db and user_uuid:
+        try:
+            orders_res = (
+                db.table('orders')
+                .select('*')
+                .eq('user_id', user_uuid)
+                .order('created_at', desc=True)
+                .execute()
+            )
+            raw_orders = orders_res.data or []
+            for ord_row in raw_orders:
+                items_res = (
+                    db.table('order_items')
+                    .select('*, products(name, product_images(image_url, is_thumbnail, display_order)), product_options(*)')
+                    .eq('order_id', ord_row['id'])
+                    .execute()
+                )
+                ord_items = []
+                for it_row in (items_res.data or []):
+                    prod = it_row.get('products') or {}
+                    opt = it_row.get('product_options') or {}
+                    c, s = split_color_size(opt)
+                    images = sorted(prod.get('product_images') or [], key=lambda x: x.get('display_order', 0))
+                    thumb = next((i for i in images if i.get('is_thumbnail')), images[0] if images else None)
+                    ord_items.append({
+                        'product_name': prod.get('name') or '상품',
+                        'color': c,
+                        'size': s,
+                        'quantity': it_row.get('quantity', 1),
+                        'unit_price': int(it_row.get('unit_price', 0) or 0),
+                        'total_price': int(it_row.get('total_price', 0) or 0),
+                        'image': thumb.get('image_url') if thumb else ''
+                    })
+                ord_row['order_items'] = ord_items
+                orders.append(ord_row)
+        except Exception as e:
+            print(f"[ERROR] 마이페이지 주문 내역 조회 실패: {e}", file=sys.stderr)
+
     # 소셜 로그인 사용자 여부 판별 (kakao_, ms_ 등 또는 이메일 로그인 여부)
-    # user_id가 kakao_ 로 시작하거나, email이 @vibe-fashion.com 가상 도메인인 경우 소셜
-    # 또는 supabase auth 사용자 정보를 조회해 provider 확인
     is_social_user = False
     if str(user_id or "").startswith("kakao_") or str(user_id or "").startswith("ms_") or "@vibe-fashion.com" in str(user_email or ""):
         is_social_user = True
@@ -1043,6 +1090,7 @@ def mypage():
         'mypage.html',
         mall_name="VIBE-FASHION",
         profile=profile,
+        orders=orders,
         updated=updated,
         is_social_user=is_social_user,
         pwd_success=pwd_success,
@@ -1261,9 +1309,442 @@ def get_cart_items():
     })
 
 
+FREE_SHIPPING_THRESHOLD = 50000
+SHIPPING_FEE = 3000
+
+
+def split_color_size(option):
+    """옵션 행에서 (색상, 사이즈) 추출. color/size 컬럼이 없으면 option_value('블랙 / S')를 분해."""
+    color = option.get('color')
+    size = option.get('size')
+    if color or size:
+        return color or '-', size or '-'
+    parts = [p.strip() for p in str(option.get('option_value') or '').split('/')]
+    if len(parts) >= 2:
+        return parts[0] or '-', parts[1] or '-'
+    return (parts[0] or '-'), '-'
+
+
+def fetch_cart_page_items(db, user_uuid):
+    """carts + product_options + products(+images)를 한 번의 JOIN 쿼리로 조회해 화면용 아이템 리스트 반환."""
+    res = (
+        db.table('carts')
+        .select('id, quantity, product_options(*), products(name, price, product_images(image_url, is_thumbnail, display_order))')
+        .eq('user_id', user_uuid)
+        .order('created_at', desc=False)
+        .execute()
+    )
+
+    items = []
+    for row in res.data or []:
+        product = row.get('products') or {}
+        option = row.get('product_options') or {}
+        if not product or not option:
+            continue
+
+        quantity = int(row.get('quantity') or 1)
+        stock = int(option.get('stock') or 0)
+        unit_price = int(product.get('price') or 0) + int(option.get('additional_price') or 0)
+        color, size = split_color_size(option)
+
+        images = sorted(product.get('product_images') or [], key=lambda x: x.get('display_order', 0))
+        thumb = next((i for i in images if i.get('is_thumbnail')), images[0] if images else None)
+
+        items.append({
+            'id': row['id'],
+            'product_name': product.get('name', ''),
+            'color': color,
+            'size': size,
+            'quantity': quantity,
+            'stock': stock,
+            'unit_price': unit_price,
+            'subtotal': unit_price * quantity,
+            'image': thumb.get('image_url') if thumb else '',
+            'is_sold_out': stock <= 0,
+        })
+    return items
+
+
 @main_bp.route('/cart', methods=['GET'])
+@login_required
 def view_cart():
     """
     장바구니 페이지 (GET /cart)
+    - 품절 아이템은 합계/배송비 계산에서 제외하고, 하나라도 있으면 주문하기 비활성화
+    - 배송비: 상품 합계 50,000원 미만 3,000원, 이상 무료
     """
-    return render_template('cart.html', mall_name="VIBE-FASHION")
+    db = supabase_admin or supabase
+    items = []
+    error = None
+
+    if not db:
+        error = "데이터베이스 연결에 실패했습니다."
+    else:
+        try:
+            user_id = session.get("user_id")
+            user_email = session.get("email")
+            user_uuid = str(user_id) if is_valid_uuid(user_id) else None
+            if not user_uuid and user_email:
+                prof = db.table('profiles').select('id').eq('email', user_email).execute()
+                if prof.data:
+                    user_uuid = str(prof.data[0]['id'])
+            if user_uuid:
+                items = fetch_cart_page_items(db, user_uuid)
+        except Exception as e:
+            print(f"[ERROR] 장바구니 페이지 조회 오류: {e}", file=sys.stderr)
+            error = "장바구니를 불러오는 중 오류가 발생했습니다."
+
+    items_total = sum(i['subtotal'] for i in items if not i['is_sold_out'])
+    shipping_fee = 0 if (not items_total or items_total >= FREE_SHIPPING_THRESHOLD) else SHIPPING_FEE
+
+    return render_template(
+        'cart.html',
+        mall_name="VIBE-FASHION",
+        items=items,
+        items_total=items_total,
+        shipping_fee=shipping_fee,
+        grand_total=items_total + shipping_fee,
+        free_shipping_threshold=FREE_SHIPPING_THRESHOLD,
+        has_sold_out=any(i['is_sold_out'] for i in items),
+        error=error,
+    )
+
+
+def get_current_user_uuid(db, session):
+    """세션 정보를 바탕으로 사용자의 프로필 UUID를 반환"""
+    user_id = session.get("user_id")
+    user_email = session.get("email")
+    if is_valid_uuid(user_id):
+        return str(user_id)
+    if user_email and db:
+        prof = db.table('profiles').select('id').eq('email', user_email).execute()
+        if prof.data:
+            return str(prof.data[0]['id'])
+    return None
+
+
+@main_bp.route('/order/checkout', methods=['GET', 'POST'])
+@login_required
+def order_checkout():
+    """
+    주문서 페이지 (GET/POST /order/checkout)
+    - 로그인 필수
+    - 장바구니 비어있으면 /cart 리다이렉트
+    - 품절(stock=0) 아이템이 하나라도 있으면 /cart 로 리다이렉트 및 안내
+    - 배송지 입력 검증 (010-0000-0000, 주소 5자 이상)
+    - POST 시 create_order 로직으로 위임
+    """
+    if request.method == 'POST':
+        return create_order()
+
+    db = supabase_admin or supabase
+    if not db:
+        return render_template('checkout.html', error="데이터베이스 연결에 실패했습니다.", items=[], profile={})
+
+    user_uuid = get_current_user_uuid(db, session)
+    if not user_uuid:
+        return redirect(url_for('auth.login'))
+
+    # 1. 장바구니 아이템 조회
+    items = fetch_cart_page_items(db, user_uuid)
+
+    # 1-1. 장바구니가 비어있는 경우
+    if not items:
+        return redirect(url_for('main.view_cart'))
+
+    # 1-2. 품절 아이템이 하나라도 있는 경우
+    if any(i['is_sold_out'] for i in items):
+        return redirect(url_for('main.view_cart', msg="품절된 상품이 있어 주문할 수 없습니다."))
+
+    # 2. 금액 계산
+    items_total = sum(i['subtotal'] for i in items)
+    shipping_fee = 0 if items_total >= FREE_SHIPPING_THRESHOLD else SHIPPING_FEE
+    grand_total = items_total + shipping_fee
+
+    # 3. 기본 프로필 정보 조회 (배송지 불러오기용)
+    profile = {
+        "full_name": session.get("name") or "",
+        "phone": session.get("phone") or "",
+        "address": ""
+    }
+    try:
+        prof_res = db.table('profiles').select('*').eq('id', user_uuid).execute()
+        if prof_res.data:
+            row = prof_res.data[0]
+            profile['full_name'] = row.get('full_name') or profile['full_name']
+            profile['phone'] = row.get('phone') or profile['phone']
+            profile['address'] = row.get('address') or ""
+    except Exception as e:
+        print(f"[WARN] 프로필 정보 조회 실패: {e}", file=sys.stderr)
+
+    return render_template(
+        'checkout.html',
+        mall_name="VIBE-FASHION",
+        items=items,
+        items_total=items_total,
+        shipping_fee=shipping_fee,
+        grand_total=grand_total,
+        free_shipping_threshold=FREE_SHIPPING_THRESHOLD,
+        profile=profile
+    )
+
+
+@main_bp.route('/order/create', methods=['POST'])
+@login_required
+def create_order():
+    """
+    주문 생성 엔드포인트 (POST /order/create)
+    처리 순서:
+    1. 장바구니 조회 + 재고 확인 (재고 부족 시 에러, 처리 중단, 아무것도 쓰지 않음)
+    2. 배송지 입력값 서버 측 재검증 (휴대폰 번호 010-0000-0000 패턴, 주소 최소 5자 이상)
+    3. 주문번호 생성: 'VF-' + 오늘날짜(YYYYMMDD) + '-' + 4자리 랜덤숫자 + 밀리초 타임스탬프 뒷 3자리
+    4. orders 테이블에 INSERT (status='PAID')
+    5. order_items INSERT (상품명, 색상, 사이즈, 가격 스냅샷)
+    6. product_options.stock 차감 (조건부 UPDATE: WHERE id=opt_id AND stock >= 수량)
+       - 영향받은 행이 0개면 "방금 재고가 소진되었습니다" 에러로 롤백 처리
+    7. carts 아이템 DELETE
+    8. /order/complete/<order_id> 리다이렉트
+    기술: service_role 키(supabase_admin)로 재고 차감 (RLS 우회)
+    """
+    db = supabase_admin or supabase
+    if not db:
+        return render_template('checkout.html', error="데이터베이스 연결에 실패했습니다.", items=[], profile={})
+
+    user_uuid = get_current_user_uuid(db, session)
+    if not user_uuid:
+        return redirect(url_for('auth.login'))
+
+    # 장바구니 원본 및 결합 조회
+    carts_res = db.table('carts').select('id, product_id, option_id, quantity').eq('user_id', user_uuid).order('created_at', desc=False).execute()
+    cart_rows = carts_res.data or []
+    if not cart_rows:
+        return redirect(url_for('main.view_cart'))
+
+    items = fetch_cart_page_items(db, user_uuid)
+    if not items:
+        return redirect(url_for('main.view_cart'))
+
+    items_total = sum(i['subtotal'] for i in items if not i['is_sold_out'])
+    shipping_fee = 0 if items_total >= FREE_SHIPPING_THRESHOLD else SHIPPING_FEE
+    grand_total = items_total + shipping_fee
+
+    profile = {
+        "full_name": session.get("name") or "",
+        "phone": session.get("phone") or "",
+        "address": ""
+    }
+
+    # 1. 장바구니 조회 + 재고 확인 (재고 부족 시 에러, 처리 중단, 아무것도 쓰지 않음)
+    for it in items:
+        if it['is_sold_out'] or it['quantity'] > it['stock']:
+            error_msg = f"'{it['product_name']}' 상품의 재고가 부족합니다. (현재 재고: {it['stock']}개)"
+            return render_template('checkout.html', error=error_msg, items=items,
+                                   items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                                   free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+    # 2. 배송지 입력값 서버 측 재검증 (휴대폰 번호 패턴, 주소 최소 길이)
+    recipient_name = request.form.get('recipient_name', '').strip()
+    recipient_phone = request.form.get('recipient_phone', '').strip()
+    shipping_address = request.form.get('shipping_address', '').strip()
+    shipping_memo = request.form.get('shipping_memo', '').strip()
+
+    if not recipient_name:
+        return render_template('checkout.html', error="수령인 이름을 입력해 주세요.", items=items,
+                               items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                               free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+    phone_regex = r'^010-\d{4}-\d{4}$'
+    if not re.match(phone_regex, recipient_phone):
+        return render_template('checkout.html', error="휴대폰 번호 형식이 올바르지 않습니다. (예: 010-0000-0000)", items=items,
+                               items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                               free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+    if len(shipping_address) < 5:
+        return render_template('checkout.html', error="배송 주소는 5자 이상 입력해 주세요.", items=items,
+                               items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                               free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+    # 3. 주문번호 생성: 'VF-' + 오늘날짜(YYYYMMDD) + '-' + 4자리 랜덤숫자 + 밀리초 타임스탬프 뒷 3자리
+    now = datetime.datetime.now()
+    date_str = now.strftime('%Y%m%d')
+    rand_4 = f"{random.randint(0, 9999):04d}"
+    ms_3 = f"{int(time.time() * 1000) % 1000:03d}"
+    order_number = f"VF-{date_str}-{rand_4}{ms_3}"
+
+    created_order_id = None
+    stock_deductions = []  # [(option_id, deducted_qty), ...] 롤백용
+
+    try:
+        # 4. orders 테이블에 INSERT (status='PAID')
+        order_insert_payload = {
+            'order_number': order_number,
+            'user_id': user_uuid,
+            'status': 'PAID',
+            'total_amount': grand_total,
+            'recipient_name': recipient_name,
+            'recipient_phone': recipient_phone,
+            'shipping_address': shipping_address,
+            'shipping_memo': shipping_memo or None
+        }
+        order_res = db.table('orders').insert(order_insert_payload).execute()
+        if not order_res.data:
+            raise Exception("주문 저장에 실패했습니다.")
+
+        created_order_id = order_res.data[0]['id']
+
+        # 5. order_items INSERT (상품명, 색상, 사이즈, 가격 스냅샷)
+        order_items_payload = []
+        cart_lookup = {c['id']: c for c in cart_rows}
+        for it in items:
+            c_row = cart_lookup.get(it['id']) or {}
+            p_id = c_row.get('product_id')
+            o_id = c_row.get('option_id')
+            order_items_payload.append({
+                'order_id': created_order_id,
+                'product_id': p_id,
+                'option_id': o_id,
+                'quantity': it['quantity'],
+                'unit_price': it['unit_price'],
+                'total_price': it['subtotal']
+            })
+
+        if order_items_payload:
+            db.table('order_items').insert(order_items_payload).execute()
+
+        # 6. product_options.stock 차감 — 반드시 조건부 UPDATE 사용:
+        # UPDATE ... SET stock = stock - 수량 WHERE id = 옵션ID AND stock >= 수량
+        # 영향받은 행이 0개면 "방금 재고가 소진되었습니다" 에러로 롤백 처리
+        admin_db = supabase_admin or db
+        for it in items:
+            c_row = cart_lookup.get(it['id']) or {}
+            o_id = c_row.get('option_id')
+            qty = it['quantity']
+            if not o_id:
+                continue
+
+            # 현재 최신 재고 조회
+            curr_opt_res = admin_db.table('product_options').select('stock').eq('id', o_id).execute()
+            if not curr_opt_res.data:
+                raise ValueError("방금 재고가 소진되었습니다")
+            current_stock = int(curr_opt_res.data[0].get('stock') or 0)
+
+            # 조건부 UPDATE: WHERE id = o_id AND stock >= qty
+            new_stock = current_stock - qty
+            up_res = admin_db.table('product_options').update({'stock': new_stock}).eq('id', o_id).gte('stock', qty).execute()
+
+            # 영향받은 행이 0개인 경우 (조건 불만족)
+            if not up_res.data:
+                raise ValueError("방금 재고가 소진되었습니다")
+
+            stock_deductions.append((o_id, qty))
+
+        # 7. carts 아이템 DELETE
+        db.table('carts').delete().eq('user_id', user_uuid).execute()
+
+        # 8. /order/complete/<order_id> 리다이렉트
+        return redirect(url_for('main.order_complete', order_id=created_order_id))
+
+    except ValueError as ve:
+        # 조건부 UPDATE 실패 시 롤백 (이미 차감된 재고 복원 + 생성된 order 삭제)
+        admin_db = supabase_admin or db
+        for o_id, qty in stock_deductions:
+            try:
+                cur = admin_db.table('product_options').select('stock').eq('id', o_id).execute()
+                if cur.data:
+                    admin_db.table('product_options').update({'stock': int(cur.data[0]['stock'] or 0) + qty}).eq('id', o_id).execute()
+            except Exception as re_err:
+                print(f"[ERROR] 재고 롤백 실패: {re_err}", file=sys.stderr)
+
+        if created_order_id:
+            try:
+                db.table('orders').delete().eq('id', created_order_id).execute()
+            except Exception as o_err:
+                print(f"[ERROR] 주문 롤백 실패: {o_err}", file=sys.stderr)
+
+        return render_template('checkout.html', error=str(ve), items=items,
+                               items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                               free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+    except Exception as e:
+        print(f"[ERROR] 주문 생성 오류: {e}", file=sys.stderr)
+        traceback.print_exc()
+
+        # 롤백 처리
+        admin_db = supabase_admin or db
+        for o_id, qty in stock_deductions:
+            try:
+                cur = admin_db.table('product_options').select('stock').eq('id', o_id).execute()
+                if cur.data:
+                    admin_db.table('product_options').update({'stock': int(cur.data[0]['stock'] or 0) + qty}).eq('id', o_id).execute()
+            except Exception:
+                pass
+
+        if created_order_id:
+            try:
+                db.table('orders').delete().eq('id', created_order_id).execute()
+            except Exception:
+                pass
+
+        return render_template('checkout.html', error=f"주문 처리 중 오류가 발생했습니다: {str(e)}", items=items,
+                               items_total=items_total, shipping_fee=shipping_fee, grand_total=grand_total,
+                               free_shipping_threshold=FREE_SHIPPING_THRESHOLD, profile=profile)
+
+
+@main_bp.route('/order/complete/<order_id>', methods=['GET'])
+@login_required
+def order_complete(order_id):
+    """
+    주문 완료 페이지 (GET /order/complete/<order_id>)
+    - 본인 주문이 맞는지 확인 (다른 사용자의 order_id 접근 차단)
+    - 주문번호, 배송지, 주문 상품 목록, 결제 금액 표시
+    - '마이페이지로' 버튼, '쇼핑 계속하기' 버튼
+    """
+    db = supabase_admin or supabase
+    user_uuid = get_current_user_uuid(db, session)
+    if not user_uuid or not is_valid_uuid(order_id):
+        return redirect(url_for('main.index'))
+
+    # 1. 본인 소유의 주문인지 확인
+    try:
+        res = db.table('orders').select('*').eq('id', order_id).execute()
+        if not res.data:
+            return redirect(url_for('main.index'))
+
+        order = res.data[0]
+        if str(order.get('user_id')) != str(user_uuid):
+            return "다른 사용자의 주문 정보에 접근할 수 없습니다.", 403
+
+        # 2. 주문 상품 목록 조회 (products, product_options JOIN)
+        items_res = (
+            db.table('order_items')
+            .select('*, products(name, product_images(image_url, is_thumbnail, display_order)), product_options(*)')
+            .eq('order_id', order_id)
+            .execute()
+        )
+        items = []
+        for it_row in (items_res.data or []):
+            prod = it_row.get('products') or {}
+            opt = it_row.get('product_options') or {}
+            c, s = split_color_size(opt)
+            images = sorted(prod.get('product_images') or [], key=lambda x: x.get('display_order', 0))
+            thumb = next((i for i in images if i.get('is_thumbnail')), images[0] if images else None)
+            items.append({
+                'product_name': prod.get('name') or '상품',
+                'color': c,
+                'size': s,
+                'quantity': it_row.get('quantity', 1),
+                'unit_price': int(it_row.get('unit_price', 0) or 0),
+                'total_price': int(it_row.get('total_price', 0) or 0),
+                'image': thumb.get('image_url') if thumb else ''
+            })
+
+        order['items'] = items
+
+    except Exception as e:
+        print(f"[ERROR] 주문 완료 조회 오류: {e}", file=sys.stderr)
+        return redirect(url_for('main.index'))
+
+    return render_template('order_complete.html', mall_name="VIBE-FASHION", order=order, order_items=order.get('items', []))
+
+
+
