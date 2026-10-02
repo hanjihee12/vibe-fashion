@@ -34,7 +34,7 @@ def create_app(test_config=None):
     )
 
     # 3. 기본 설정값 구성
-    admin_prefix = os.getenv('ADMIN_PATH_PREFIX', '/mgt-sec-9a72df81c3e4').strip()
+    admin_prefix = os.getenv('ADMIN_PATH_PREFIX', '/secret-mgt-9a72df81c3e4').strip()
     if not admin_prefix.startswith('/'):
         admin_prefix = '/' + admin_prefix
 

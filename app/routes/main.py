@@ -10,6 +10,7 @@ import sys
 import uuid
 import time
 import random
+import hashlib
 import datetime
 import traceback
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
@@ -576,7 +577,6 @@ def api_product_options(product_id):
     # DB에 데이터가 없으면 기본 더미 사이즈 제공 (UI 표시용)
     if not options:
         print(f"[INFO] 상품 {product_id}의 {color} 색상에 DB 옵션이 없습니다. 기본 사이즈 제공")
-        import hashlib
         for s, stk, add_p in [('S', 10, 0), ('M', 15, 0), ('L', 8, 2000), ('XL', 5, 2000)]:
             # UUID 기반 ID 생성 (MD5 해시)
             hash_str = f"{product_id}{color}{s}".encode()
@@ -782,9 +782,8 @@ def add_to_cart():
         return response
 
     except Exception as e:
-        print(f"[ERROR] add_to_cart: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] add_to_cart: {str(e)}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return jsonify({
             "success": False,
             "message": f"서버 오류: {str(e)}"

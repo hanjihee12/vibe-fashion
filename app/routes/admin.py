@@ -33,7 +33,7 @@ if SUPABASE_URL and (SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY):
 
 # 관리자 기본 계정 설정 (환경변수 또는 기본값)
 DEFAULT_ADMIN_ID = os.getenv('ADMIN_USERNAME', 'admin_master')
-DEFAULT_ADMIN_PW = os.getenv('ADMIN_PASSWORD', 'admin1234')
+DEFAULT_ADMIN_PW = os.getenv('ADMIN_PASSWORD', 'vibe_admin_#2026!k9')
 
 
 def admin_required(func):
