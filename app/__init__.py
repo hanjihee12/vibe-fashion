@@ -50,10 +50,12 @@ def create_app(test_config=None):
         app.config.from_mapping(test_config)
 
     # 4. 라우트(Blueprint) 등록
-    # routes 폴더의 main_bp(메인 블루프린트) 및 auth_bp를 앱에 등록합니다.
+    # routes 폴더의 main_bp(메인 블루프린트), auth_bp, admin_bp를 앱에 등록합니다.
     from .routes.main import main_bp
     from .routes.auth import auth_bp
+    from .routes.admin import admin_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
 
     return app

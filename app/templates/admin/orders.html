@@ -1,0 +1,110 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}주문 관리 | 관리자 센터{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-3 mb-4 border-bottom">
+    <h1 class="h3 fw-bold mb-0">주문 관리</h1>
+    <div class="btn-group">
+        <a href="{{ url_for('admin.orders') }}" class="btn btn-sm {% if not current_status %}btn-dark{% else %}btn-outline-dark{% endif %}">전체</a>
+        <a href="{{ url_for('admin.orders', status='PAID') }}" class="btn btn-sm {% if current_status == 'PAID' %}btn-dark{% else %}btn-outline-dark{% endif %}">결제완료</a>
+        <a href="{{ url_for('admin.orders', status='SHIPPING') }}" class="btn btn-sm {% if current_status == 'SHIPPING' %}btn-dark{% else %}btn-outline-dark{% endif %}">배송중</a>
+        <a href="{{ url_for('admin.orders', status='DELIVERED') }}" class="btn btn-sm {% if current_status == 'DELIVERED' %}btn-dark{% else %}btn-outline-dark{% endif %}">배송완료</a>
+        <a href="{{ url_for('admin.orders', status='CANCELLED') }}" class="btn btn-sm {% if current_status == 'CANCELLED' %}btn-dark{% else %}btn-outline-dark{% endif %}">취소</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th>주문번호 / 일시</th>
+                        <th>주문자 / 수령인</th>
+                        <th>주문 상품 상세</th>
+                        <th class="text-end">결제금액</th>
+                        <th class="text-center" style="width: 160px;">상태 변경</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ord in orders %}
+                    <tr>
+                        <td>
+                            <div class="font-monospace fw-bold text-primary">{{ ord.order_number }}</div>
+                            <small class="text-muted">{{ ord.created_at[:19].replace('T', ' ') if ord.created_at else '' }}</small>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ ord.recipient_name }}</div>
+                            <small class="text-muted d-block">{{ ord.recipient_phone }}</small>
+                            <small class="text-secondary text-truncate d-inline-block" style="max-width: 200px;" title="{{ ord.shipping_address }}">
+                                {{ ord.shipping_address }}
+                            </small>
+                        </td>
+                        <td>
+                            <ul class="list-unstyled mb-0 small">
+                                {% for it in ord.order_items %}
+                                <li>
+                                    • {{ it.products.name if it.products else '상품' }}
+                                    <span class="text-muted">({{ it.product_options.option_value if it.product_options else '' }})</span>
+                                    × <strong>{{ it.quantity }}개</strong>
+                                </li>
+                                {% else %}
+                                <li class="text-muted">상세 항목 없음</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td class="text-end fw-bold fs-6">{{ '{:,}'.format(ord.total_amount|int) }}원</td>
+                        <td class="text-center">
+                            <select class="form-select form-select-sm status-select" data-order-id="{{ ord.id }}">
+                                <option value="PENDING" {% if ord.status == 'PENDING' %}selected{% endif %}>PENDING</option>
+                                <option value="PAID" {% if ord.status == 'PAID' %}selected{% endif %}>PAID (결제완료)</option>
+                                <option value="SHIPPING" {% if ord.status == 'SHIPPING' %}selected{% endif %}>SHIPPING (배송중)</option>
+                                <option value="DELIVERED" {% if ord.status == 'DELIVERED' %}selected{% endif %}>DELIVERED (완료)</option>
+                                <option value="CANCELLED" {% if ord.status == 'CANCELLED' %}selected{% endif %}>CANCELLED (취소)</option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-5">주문 내역이 없습니다.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.status-select').forEach(select => {
+    select.addEventListener('change', function() {
+        const orderId = this.dataset.orderId;
+        const newStatus = this.value;
+        const originalStatus = this.dataset.current || newStatus;
+
+        fetch(`/admin/orders/${orderId}/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `status=${encodeURIComponent(newStatus)}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                this.dataset.current = newStatus;
+            } else {
+                alert('오류: ' + data.message);
+                this.value = originalStatus;
+            }
+        })
+        .catch(err => {
+            alert('상태 변경 중 통신 오류가 발생했습니다.');
+            this.value = originalStatus;
+        });
+    });
+});
+</script>
+{% endblock %}
