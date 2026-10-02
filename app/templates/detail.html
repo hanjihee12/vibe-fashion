@@ -20,13 +20,15 @@
             <div class="sticky-top" style="top: 90px;">
                 <!-- 메인 큰 이미지 -->
                 <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-3 bg-white">
-                    <div class="ratio ratio-4x3 ratio-md-1x1 position-relative">
-                        <img id="mainProductImage" 
-                             src="{{ product.thumbnail_url }}" 
-                             alt="{{ product.name }}" 
-                             class="w-100 h-100 object-fit-cover transition-img">
+                    <div class="detail-image-frame position-relative">
+                        <div class="ratio ratio-4x3 ratio-md-1x1">
+                            <img id="mainProductImage"
+                                 src="{{ product.thumbnail_url }}"
+                                 alt="{{ product.name }}"
+                                 class="w-100 h-100 object-fit-cover transition-img">
+                        </div>
                         {% if product.discount_rate > 0 %}
-                        <span class="badge bg-danger position-absolute top-0 start-0 m-3 px-3 py-2 rounded-pill fs-6 shadow-sm fw-bold">
+                        <span class="badge bg-danger detail-image-discount-badge position-absolute top-0 start-0 m-3 rounded-pill shadow-sm fw-bold">
                             {{ product.discount_rate }}% OFF
                         </span>
                         {% endif %}

@@ -299,6 +299,15 @@ body {
     transform: scale(1.04);
 }
 
+.detail-image-frame .detail-image-discount-badge {
+    width: auto;
+    height: auto;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
 /* 
     할인 배지 & 상태 배지 (Badge)
     - 조건: 코랄 배경(#ff6b5b), 흰 텍스트(#ffffff)
