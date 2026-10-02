@@ -525,6 +525,7 @@ def product_detail(product_id):
 
 
 @main_bp.route('/api/products/<product_id>/options')
+@main_bp.route('/api/products/<product_id>/sizes')
 def api_product_options(product_id):
     """
     선택한 색상에 해당하는 사이즈 목록 및 재고/추가금 조회 API
@@ -591,6 +592,9 @@ def api_product_options(product_id):
                 'additional_price': add_p,
                 'additional_price_str': f"+{add_p:,}원" if add_p > 0 else ""
             })
+
+    if request.path.endswith('/sizes'):
+        return jsonify(options)
 
     return jsonify({
         'status': 'success',
