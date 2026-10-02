@@ -9,6 +9,7 @@
 
 import os
 import sys
+import hmac
 import functools
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from dotenv import load_dotenv
@@ -16,7 +17,8 @@ from supabase import create_client, Client
 
 load_dotenv()
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+# url_prefix는 create_app()에서 환경변수 ADMIN_PATH_PREFIX를 기반으로 등록됩니다.
+admin_bp = Blueprint('admin', __name__)
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
@@ -30,7 +32,7 @@ if SUPABASE_URL and (SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY):
         print(f"[ERROR] Admin Supabase 클라이언트 초기화 실패: {e}", file=sys.stderr)
 
 # 관리자 기본 계정 설정 (환경변수 또는 기본값)
-DEFAULT_ADMIN_ID = os.getenv('ADMIN_USERNAME', 'admin')
+DEFAULT_ADMIN_ID = os.getenv('ADMIN_USERNAME', 'admin_master')
 DEFAULT_ADMIN_PW = os.getenv('ADMIN_PASSWORD', 'admin1234')
 
 
@@ -58,7 +60,12 @@ def login():
         admin_id = os.getenv('ADMIN_USERNAME', DEFAULT_ADMIN_ID)
         admin_pw = os.getenv('ADMIN_PASSWORD', DEFAULT_ADMIN_PW)
 
-        if username == admin_id and password == admin_pw:
+        # 안전한 상수 시간 문자열 비교(타이밍 공격 방지)
+        id_valid = hmac.compare_digest(username, admin_id)
+        pw_valid = hmac.compare_digest(password, admin_pw)
+
+        if id_valid and pw_valid:
+            session.permanent = False  # 브라우저 종료 시 세션 자동 만료
             session['is_admin'] = True
             session['admin_user'] = username
             next_url = request.args.get('next') or url_for('admin.dashboard')

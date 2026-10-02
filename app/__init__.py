@@ -5,7 +5,8 @@ VIBE-FASHION 웹 애플리케이션 팩토리 모듈
 """
 
 import os
-from flask import Flask
+from datetime import timedelta
+from flask import Flask, abort
 from dotenv import load_dotenv
 
 # .env 파일에서 환경 변수를 로드합니다.
@@ -33,12 +34,18 @@ def create_app(test_config=None):
     )
 
     # 3. 기본 설정값 구성
+    admin_prefix = os.getenv('ADMIN_PATH_PREFIX', '/mgt-sec-9a72df81c3e4').strip()
+    if not admin_prefix.startswith('/'):
+        admin_prefix = '/' + admin_prefix
+
     app.config.from_mapping(
         SECRET_KEY=os.getenv('SECRET_KEY', 'vibe-fashion-default-secret-key'),
         APP_NAME='VIBE-FASHION',
         DEBUG=os.getenv('FLASK_DEBUG', '1') == '1',
         SESSION_COOKIE_SAMESITE='Lax',
         SESSION_COOKIE_HTTPONLY=True,
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
+        ADMIN_PATH_PREFIX=admin_prefix,
     )
 
     # 리버스 프록시(Azure App Service 등) 환경에서 올바른 scheme(https) 및 host를 인식하도록 설정
@@ -56,6 +63,15 @@ def create_app(test_config=None):
     from .routes.admin import admin_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(admin_bp)
+
+    current_admin_prefix = app.config.get('ADMIN_PATH_PREFIX', admin_prefix)
+    app.register_blueprint(admin_bp, url_prefix=current_admin_prefix)
+
+    # 보안 방어: 기존의 흔한 '/admin' 경로로 접속을 시도하는 외부인/스캐너는 404 차단
+    if current_admin_prefix != '/admin':
+        @app.route('/admin')
+        @app.route('/admin/<path:subpath>')
+        def block_default_admin(subpath=None):
+            abort(404)
 
     return app

@@ -55,22 +55,22 @@
                 <div class="small text-muted text-uppercase px-2 mb-2">메뉴</div>
                 <ul class="nav flex-column mb-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path in ['/admin', '/admin/', '/admin/dashboard'] %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">
+                        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">
                             <i class="bi bi-speedometer2 me-2"></i>대시보드
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/admin/orders' in request.path %}active{% endif %}" href="{{ url_for('admin.orders') }}">
+                        <a class="nav-link {% if request.endpoint == 'admin.orders' %}active{% endif %}" href="{{ url_for('admin.orders') }}">
                             <i class="bi bi-box-seam me-2"></i>주문 관리
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/admin/products' in request.path %}active{% endif %}" href="{{ url_for('admin.products') }}">
+                        <a class="nav-link {% if request.endpoint == 'admin.products' %}active{% endif %}" href="{{ url_for('admin.products') }}">
                             <i class="bi bi-tags me-2"></i>상품 / 재고
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if '/admin/users' in request.path %}active{% endif %}" href="{{ url_for('admin.users') }}">
+                        <a class="nav-link {% if request.endpoint == 'admin.users' %}active{% endif %}" href="{{ url_for('admin.users') }}">
                             <i class="bi bi-people me-2"></i>회원 관리
                         </a>
                     </li>

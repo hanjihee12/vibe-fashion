@@ -84,8 +84,9 @@ document.querySelectorAll('.status-select').forEach(select => {
         const orderId = this.dataset.orderId;
         const newStatus = this.value;
         const originalStatus = this.dataset.current || newStatus;
+        const targetUrl = "{{ url_for('admin.orders') }}/" + encodeURIComponent(orderId) + "/status";
 
-        fetch(`/admin/orders/${orderId}/status`, {
+        fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `status=${encodeURIComponent(newStatus)}`
